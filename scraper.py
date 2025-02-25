@@ -22,7 +22,7 @@ import io, os
 import csv, json
 
 secret_key_str = os.getenv("MY_SECRET_KEY")
-print("secret key is : {secret_key_str}")
+print(f"secret key is : {secret_key_str}")
 class DriveManager:
     def __init__(self):
         SCOPES = ['https://www.googleapis.com/auth/drive.file']
