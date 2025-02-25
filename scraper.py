@@ -396,14 +396,14 @@ SearchMore
                 soup = self.getSoup(url)
             except Exception as e:
                 logger.warning(f"getting error while processing {url} skiped")
-                self.error_urls.appen({"url" : url})
+                self.error_urls.append({"url" : url})
                 continue
             try:
                 content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
                 content_data = self.clean_text(content_data)
             except Exception as e:
                 logger.critical("all data not found skiped")
-                self.error_urls.appen({"url" : url})
+                self.error_urls.append({"url" : url})
                 continue
             temp['OSAC_ID'] = self.extract_id(url)
             try:
@@ -415,7 +415,7 @@ SearchMore
                 temp['OSAC_Title'] = soup.find("div",{"class" : "mss-page-title"}).get_text(strip=True)
             except Exception as e:
                 logger.warning("title not found skiping ")
-                self.error_urls.appen({"url" : url})
+                self.error_urls.append({"url" : url})
                 continue
             
             temp['OSAC_URL'] = url
