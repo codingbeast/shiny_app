@@ -21,8 +21,6 @@ from google.oauth2 import service_account
 import io, os
 import csv, json
 
-secret_key_str = os.getenv("MY_SECRET_KEY")
-print(f"secret key is : {secret_key_str}")
 class DriveManager:
     def __init__(self):
         SCOPES = ['https://www.googleapis.com/auth/drive.file']
@@ -242,7 +240,23 @@ class OsacScraper(DriveManager):
         """Method to fetch cookies and verification code from the home page."""
         logger.info("getting cookies and verification code from osac home page..")
         url = "https://www.osac.gov/Content/Browse/Report?subContentTypes=Alerts%2CTravel%20Advisories"
-        res = self.s.get(url)
+        res = self.s.get(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.osac.gov/Content/Browse/Report?subContentTypes=Alerts%2CTravel%20Advisories",
+            "Origin": "https://www.osac.gov",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-GPC": "1",
+            "Priority": "u=0",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+            "TE": "trailers",
+        })
         soup = BeautifulSoup(res.text, "lxml")
 
         # Extract cookies and verification code
