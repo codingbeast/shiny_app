@@ -2,17 +2,114 @@ import requests
 from bs4 import BeautifulSoup
 from mycolorlogger.mylogger import log
 from datetime import datetime, timedelta
-
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2 import service_account
+import io, re
+import csv
+from urllib.parse import urlparse
 logger = log.logger
 
-class OsacScraper:
+
+
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2 import service_account
+import io
+import csv
+
+class DriveManager:
+    def __init__(self):
+        SCOPES = ['https://www.googleapis.com/auth/drive.file']
+        SERVICE_ACCOUNT_FILE = 'doc/service_account.json'
+
+        # Store folder IDs as instance variables
+        self.CSV_FOLDER_ID = "1NrmVf1DfAAqxkg72nFLCd4hwGciVVFbJ"
+        self.HTML_FOLDER_ID = "11Rm4t0tlYweXXxNjoYuXB7L0rVd-fILj"
+
+        # Authenticate and build the Drive service
+        self.creds = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        self.drive_service = build('drive', 'v3', credentials=self.creds)
+        super().__init__()
+
+    def write_text_to_drive(self, file_name, content, folder_id=None):
+        """
+        Creates a text file on Google Drive and writes content to it.
+        If folder_id is not provided, it defaults to the HTML folder.
+        """
+        if folder_id is None:
+            folder_id = self.HTML_FOLDER_ID  # Default folder is HTML folder
+
+        file_metadata = {
+            'name': file_name,
+            'mimeType': 'text/plain',
+            'parents': [folder_id]
+        }
+        media = MediaIoBaseUpload(io.BytesIO(content.encode("utf-8")), mimetype='text/plain')
+
+        file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        print(f"Text file '{file_name}' created successfully! File ID: {file.get('id')}")
+        return file.get('id')
+
+    def write_csv_to_drive(self, file_name, data_list, folder_id=None):
+        """
+        Creates a CSV file on Google Drive and writes a list of dictionaries to it.
+        If folder_id is not provided, it defaults to the CSV folder.
+        """
+        if not data_list:
+            print("Data list is empty. Cannot create CSV file.")
+            return None
+
+        if folder_id is None:
+            folder_id = self.CSV_FOLDER_ID  # Default folder is CSV folder
+
+        # Extract headers from the first dictionary
+        headers = data_list[0].keys()
+
+        # Write CSV to an in-memory file
+        csv_buffer = io.StringIO()
+        writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(data_list)
+
+        file_metadata = {
+            'name': file_name,
+            'mimeType': 'text/csv',
+            'parents': [folder_id]
+        }
+        media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode("utf-8")), mimetype='text/csv')
+
+        file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        print(f"CSV file '{file_name}' created successfully! File ID: {file.get('id')}")
+        return file.get('id')
+
+    def get_all_files_from_html_folder(self):
+        """
+        Fetches all file names from the HTML folder and returns them as a list.
+        """
+        query = f"'{self.HTML_FOLDER_ID}' in parents and trashed=false"
+        results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get('files', [])
+
+        if not files:
+            print("No files found in the HTML folder.")
+            return []
+
+        file_names = [file['name'] for file in files]
+        print("Files in HTML Folder:", file_names)
+        return file_names
+
+class OsacScraper(DriveManager):
     def __init__(self):
         self.s = requests.Session()  # Session object for making requests
         self._cookies = None  # Private variable for cookies
         self._verification_code = None  # Private variable for verification code
         self._api_url = "https://www.osac.gov/Content/Search"
         self.page_links_container = []
+        self.osac_dataset = []
         self.twelve_months_buffer_period = datetime.today() - timedelta(days=365)
+        super().__init__()
 
     @property
     def get_header(self) -> dict:
@@ -143,10 +240,57 @@ SearchMore
                 else:
                     self.page_links_container.append(link)  # Add link to the container
 
-            if page_number > 5:  # todo: Stop after 10 pages for debug
+            if page_number > 0:  # todo: Stop after 10 pages for debug
                 logger.info("page is more then 5 stopped ")
                 break
             page_number += 1
+
+    def extract_id(self, url):
+        return url.rstrip('/').split('/')[-1]  # Get last part of the URL
+    def getSoup(self,url) -> BeautifulSoup:
+        res = requests.get(url)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text,"lxml")
+        return soup
+    def get_html_data( soup : BeautifulSoup, preprocess = True) -> str:
+        if preprocess == False:
+            return str(soup)
+        elements_to_remove = [
+            {"id": "sessionTimeoutModal"},
+            {"id": "LayoutLoading"},
+            {"class": "mss-topmenu-list"},
+            {"class": "mss-topmenu-navbar mss-topmenu-navbar-user"},
+            {"class": "dropdown mss-display-inlineblock mss-btn-share-container"},
+            {"class": "mss-printheader-text"},
+            {"input": {"value": "Print"}},
+            "footer",
+            {"section": {"id": "printFooter"}},
+            ]
+        # Remove elements
+        for element in elements_to_remove:
+            if isinstance(element, dict):
+                # Handle cases where the element is a dictionary (e.g., {"id": "sessionTimeoutModal"})
+                for tag, attrs in element.items():
+                    found = soup.find(tag, attrs)
+                    if found:
+                        found.decompose()
+            else:
+                # Handle cases where the element is a string (e.g., "footer")
+                found = soup.find(element)
+                if found:
+                    found.decompose() if isinstance(found, str) else found  
+        return str(soup)
+    def extract_details(self)-> None:
+        for url in self.page_links_container:
+            id_ = self.extract_id(url)
+            html_filename = f"{id_}.html"
+            try:
+                soup = self.getSoup(url)
+            except Exception as e:
+                logger.warning(f"getting error while processing {url} skiped")
+                continue
+            #extract string from soup : add this in end to avoid other link extraction set preprocess to true if you want remove unwnatext text
+            html_str = self.get_html_data(soup, preprocess = True)
 if __name__ == "__main__":
     osac_scraper = OsacScraper()
     osac_scraper.set_cookie_from_home_page()
