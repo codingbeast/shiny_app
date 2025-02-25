@@ -188,6 +188,7 @@ class OsacScraper(DriveManager):
         self._api_url = "https://www.osac.gov/Content/Search"
         self.page_links_container = []
         self.osac_dataset = []
+        self.error_urls = []
         self.twelve_months_buffer_period = datetime.today() - timedelta(days=365)
         super().__init__()
 
@@ -395,12 +396,14 @@ SearchMore
                 soup = self.getSoup(url)
             except Exception as e:
                 logger.warning(f"getting error while processing {url} skiped")
+                self.error_urls.appen({"url" : url})
                 continue
             try:
                 content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
                 content_data = self.clean_text(content_data)
             except Exception as e:
                 logger.critical("all data not found skiped")
+                self.error_urls.appen({"url" : url})
                 continue
             temp['OSAC_ID'] = self.extract_id(url)
             try:
@@ -412,6 +415,7 @@ SearchMore
                 temp['OSAC_Title'] = soup.find("div",{"class" : "mss-page-title"}).get_text(strip=True)
             except Exception as e:
                 logger.warning("title not found skiping ")
+                self.error_urls.appen({"url" : url})
                 continue
             
             temp['OSAC_URL'] = url
@@ -461,6 +465,7 @@ SearchMore
     def save_csv_to_drive(self,) -> None:
         csv_data = self.osac_dataset
         self.write_csv_to_drive(file_name="osac.csv", data_list=csv_data, append=True)
+        self.write_csv_to_drive(file_name="errors.csv", data_list=self.error_urls, append=True)
 if __name__ == "__main__":
     osac_scraper = OsacScraper()
     #set extract cookies from home to request api
