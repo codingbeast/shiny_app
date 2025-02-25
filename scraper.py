@@ -3,10 +3,12 @@ from bs4 import BeautifulSoup
 from mycolorlogger.mylogger import log
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2 import service_account
 import io, re
 import csv
+import re
+import unicodedata
 from urllib.parse import urlparse
 logger = log.logger
 
@@ -52,13 +54,22 @@ class DriveManager:
         print(f"Text file '{file_name}' created successfully! File ID: {file.get('id')}")
         return file.get('id')
 
-    def write_csv_to_drive(self, file_name, data_list, folder_id=None):
+    def write_csv_to_drive(self, file_name, data_list, folder_id=None, append=False):
         """
-        Creates a CSV file on Google Drive and writes a list of dictionaries to it.
+        Creates or appends to a CSV file on Google Drive and writes a list of dictionaries to it.
         If folder_id is not provided, it defaults to the CSV folder.
+
+        Args:
+            file_name (str): Name of the CSV file.
+            data_list (list): List of dictionaries to write to the CSV.
+            folder_id (str, optional): ID of the folder to store the file. Defaults to CSV_FOLDER_ID.
+            append (bool, optional): If True, appends to an existing file. Defaults to False.
+
+        Returns:
+            str: File ID of the created/updated CSV file.
         """
         if not data_list:
-            print("Data list is empty. Cannot create CSV file.")
+            print("Data list is empty. Cannot create or update CSV file.")
             return None
 
         if folder_id is None:
@@ -67,22 +78,83 @@ class DriveManager:
         # Extract headers from the first dictionary
         headers = data_list[0].keys()
 
+        # Check if the file already exists
+        file_id = None
+        if append:
+            file_id = self._get_file_id(file_name, folder_id)
+
+        if file_id:
+            # Download the existing file
+            existing_csv = self._download_file(file_id)
+            existing_data = list(csv.DictReader(io.StringIO(existing_csv)))
+
+            # Append new data to existing data
+            data_list = existing_data + data_list
+
         # Write CSV to an in-memory file
         csv_buffer = io.StringIO()
         writer = csv.DictWriter(csv_buffer, fieldnames=headers)
         writer.writeheader()
         writer.writerows(data_list)
 
+        # Prepare file metadata
         file_metadata = {
             'name': file_name,
             'mimeType': 'text/csv',
             'parents': [folder_id]
         }
-        media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode("utf-8")), mimetype='text/csv')
 
-        file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        print(f"CSV file '{file_name}' created successfully! File ID: {file.get('id')}")
+        # Upload the file
+        media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode("utf-8")), mimetype='text/csv')
+        if file_id:
+            # Update the existing file
+            file = self.drive_service.files().update(fileId=file_id, media_body=media, fields='id').execute()
+            print(f"CSV file '{file_name}' updated successfully! File ID: {file.get('id')}")
+        else:
+            # Create a new file
+            file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            print(f"CSV file '{file_name}' created successfully! File ID: {file.get('id')}")
+
         return file.get('id')
+
+    def _get_file_id(self, file_name, folder_id):
+        """
+        Get the file ID of an existing file in Google Drive.
+
+        Args:
+            file_name (str): Name of the file.
+            folder_id (str): ID of the folder to search in.
+
+        Returns:
+            str: File ID if found, otherwise None.
+        """
+        query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
+        response = self.drive_service.files().list(q=query, spaces='drive', fields='files(id)').execute()
+        files = response.get('files', [])
+
+        if files:
+            return files[0]['id']
+        return None
+
+    def _download_file(self, file_id):
+        """
+        Download the content of a file from Google Drive.
+
+        Args:
+            file_id (str): ID of the file to download.
+
+        Returns:
+            str: Content of the file.
+        """
+        request = self.drive_service.files().get_media(fileId=file_id)
+        file = io.BytesIO()
+        downloader = MediaIoBaseDownload(file, request)
+
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+
+        return file.getvalue().decode("utf-8")
 
     def get_all_files_from_html_folder(self):
         """
@@ -186,7 +258,7 @@ Content-Disposition: form-data; name="SortOrderCode"
 --{boundary}
 Content-Disposition: form-data; name="CurrentPageNumber"
 
-3
+{page_number}
 --{boundary}
 Content-Disposition: form-data; name="ContentTypeIds"
 
@@ -210,7 +282,7 @@ false
 --{boundary}
 Content-Disposition: form-data; name="PageSize"
 
-500
+20
 --{boundary}
 Content-Disposition: form-data; name="actionType"
 
@@ -252,7 +324,7 @@ SearchMore
         res.raise_for_status()
         soup = BeautifulSoup(res.text,"lxml")
         return soup
-    def get_html_data( soup : BeautifulSoup, preprocess = True) -> str:
+    def get_html_data(self,  soup : BeautifulSoup, preprocess = True) -> str:
         if preprocess == False:
             return str(soup)
         elements_to_remove = [
@@ -280,8 +352,16 @@ SearchMore
                 if found:
                     found.decompose() if isinstance(found, str) else found  
         return str(soup)
+
+    def clean_text(self, text):
+        return unicodedata.normalize("NFKC", text).strip()
     def extract_details(self)-> None:
-        for url in self.page_links_container:
+
+        total_length = len(self.page_links_container)
+        
+        for index_, url in enumerate(self.page_links_container, start=1):
+            logger.info(f"{index_} out of {total_length} : {url}")
+            temp={}
             id_ = self.extract_id(url)
             html_filename = f"{id_}.html"
             try:
@@ -289,11 +369,62 @@ SearchMore
             except Exception as e:
                 logger.warning(f"getting error while processing {url} skiped")
                 continue
+            try:
+                content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
+                content_data = self.clean_text(content_data)
+            except Exception as e:
+                logger.critical("all data not found skiped")
+                continue
+            try:
+                location = re.search(r"Locations?:\s*(.*?)\s*Events?", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                temp['OSAC_Location'] = location
+            except Exception as e:
+                logger.warning("location not found set empty string")
+                temp['OSAC_Location'] =  ""
+            try:
+                events = re.search(r"Events?:\s*(.*?)\s*Actions? to Take:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                temp['OSAC_Events'] = events
+            except Exception as e:
+                logger.warning("events not found set empty string .")
+                temp['OSAC_Events']  = ""
+
+            try:
+                actions_to_take = re.search(r"Actions? to Take:\s*(.*?)\s*Assistance:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                temp['OSAC_Actions'] = actions_to_take
+            except Exception as e:
+                logger.warning("actions not found set empty string .")
+                temp['OSAC_Actions']  = ""
+            try:
+                assistance = re.search(r"Assistance:\s*(.*)", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                temp['OSAC_Assistance'] = assistance
+            except Exception as e:
+                logger.warning("assitance not found set empty string.")
+                temp['OSAC_Assistance'] = ""
+            #store to a dataset
+            self.osac_dataset.append(temp)
             #extract string from soup : add this in end to avoid other link extraction set preprocess to true if you want remove unwnatext text
             html_str = self.get_html_data(soup, preprocess = True)
+            self.write_text_to_drive(file_name=html_filename,content=html_str)
+            break
+    def filter_already_scraped_data(self,):
+        all_files = self.get_all_files_from_html_folder()
+        print(all_files)
+    def save_csv_to_drive(self,) -> None:
+        csv_data = self.osac_dataset
+        self.write_csv_to_drive(file_name="osac.csv", data_list=csv_data, append=True)
 if __name__ == "__main__":
     osac_scraper = OsacScraper()
+    #set extract cookies from home to request api
     osac_scraper.set_cookie_from_home_page()
+
+    #get all links from search page (12 months buffer time)
     osac_scraper.get_advisories()
-    with open("links.txt","w") as writer:
-        writer.write("\n".join(osac_scraper.page_links_container))
+
+    #check if already data availble inside our drive folder and remove links if already available 
+    osac_scraper.filter_already_scraped_data()
+
+    #extract details and save html in drive
+    osac_scraper.extract_details()
+
+    #save extracted data to drive in csv format.
+    osac_scraper.save_csv_to_drive()
