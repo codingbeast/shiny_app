@@ -18,7 +18,7 @@ logger = log.logger
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2 import service_account
-import io
+import io, os
 import csv
 
 class DriveManager:
@@ -30,9 +30,16 @@ class DriveManager:
         self.CSV_FOLDER_ID = "1NrmVf1DfAAqxkg72nFLCd4hwGciVVFbJ"
         self.HTML_FOLDER_ID = "11Rm4t0tlYweXXxNjoYuXB7L0rVd-fILj"
 
+        secret_key = os.getenv("MY_SECRET_KEY")
         # Authenticate and build the Drive service
-        self.creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        if secret_key:
+            self.creds = service_account.Credentials.from_service_account_info(
+            secret_key, scopes=SCOPES)
+        else:
+            self.creds = service_account.Credentials.from_service_account_file(
+                SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        
+        
         self.drive_service = build('drive', 'v3', credentials=self.creds)
         super().__init__()
 
