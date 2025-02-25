@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 import io, re
 import csv
 import re
+from urllib.parse import urlparse
 import unicodedata
 from urllib.parse import urlparse
 logger = log.logger
@@ -51,7 +52,7 @@ class DriveManager:
         media = MediaIoBaseUpload(io.BytesIO(content.encode("utf-8")), mimetype='text/plain')
 
         file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        print(f"Text file '{file_name}' created successfully! File ID: {file.get('id')}")
+        logger.info(f"html file '{file_name}' created successfully! File ID: {file.get('id')}")
         return file.get('id')
 
     def write_csv_to_drive(self, file_name, data_list, folder_id=None, append=False):
@@ -69,7 +70,7 @@ class DriveManager:
             str: File ID of the created/updated CSV file.
         """
         if not data_list:
-            print("Data list is empty. Cannot create or update CSV file.")
+            logger.warning("Data list is empty. Cannot create or update CSV file.")
             return None
 
         if folder_id is None:
@@ -83,17 +84,18 @@ class DriveManager:
         if append:
             file_id = self._get_file_id(file_name, folder_id)
 
-        if file_id:
-            # Download the existing file
-            existing_csv = self._download_file(file_id)
-            existing_data = list(csv.DictReader(io.StringIO(existing_csv)))
+            if file_id:
+                # Download the existing file
+                existing_csv = self._download_file(file_id)
+                existing_data = list(csv.DictReader(io.StringIO(existing_csv)))
 
-            # Append new data to existing data
-            data_list = existing_data + data_list
+                # Append new data to existing data
+                data_list = existing_data + data_list
 
         # Write CSV to an in-memory file
         csv_buffer = io.StringIO()
         writer = csv.DictWriter(csv_buffer, fieldnames=headers)
+        # Write header and rows
         writer.writeheader()
         writer.writerows(data_list)
 
@@ -109,14 +111,13 @@ class DriveManager:
         if file_id:
             # Update the existing file
             file = self.drive_service.files().update(fileId=file_id, media_body=media, fields='id').execute()
-            print(f"CSV file '{file_name}' updated successfully! File ID: {file.get('id')}")
+            logger.info(f"CSV file '{file_name}' updated successfully! File ID: {file.get('id')}")
         else:
             # Create a new file
             file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-            print(f"CSV file '{file_name}' created successfully! File ID: {file.get('id')}")
+            logger.info(f"CSV file '{file_name}' created successfully! File ID: {file.get('id')}")
 
         return file.get('id')
-
     def _get_file_id(self, file_name, folder_id):
         """
         Get the file ID of an existing file in Google Drive.
@@ -165,11 +166,10 @@ class DriveManager:
         files = results.get('files', [])
 
         if not files:
-            print("No files found in the HTML folder.")
+            logger.info("No files found in the HTML folder.")
             return []
 
         file_names = [file['name'] for file in files]
-        print("Files in HTML Folder:", file_names)
         return file_names
 
 class OsacScraper(DriveManager):
@@ -352,6 +352,9 @@ SearchMore
                 if found:
                     found.decompose() if isinstance(found, str) else found  
         return str(soup)
+    
+    def extract_id(self, url):
+        return url.rstrip('/').split('/')[-1]  # Get last part of the URL
 
     def clean_text(self, text):
         return unicodedata.normalize("NFKC", text).strip()
@@ -375,27 +378,41 @@ SearchMore
             except Exception as e:
                 logger.critical("all data not found skiped")
                 continue
+            temp['OSAC_ID'] = self.extract_id(url)
             try:
-                location = re.search(r"Locations?:\s*(.*?)\s*Events?", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
+            except Exception as e:
+                logger.warning("date not found setting empty string")
+                temp['OSAC_Date'] = ""
+            try:
+                temp['OSAC_Title'] = soup.find("div",{"class" : "mss-page-title"}).get_text(strip=True)
+            except Exception as e:
+                logger.warning("title not found skiping ")
+                continue
+            
+            temp['OSAC_URL'] = url
+            
+            try:
+                location = re.search(r"Locations?\s*:\s*(.*?)\s*Events?", content_data, re.IGNORECASE | re.DOTALL).group(1)
                 temp['OSAC_Location'] = location
             except Exception as e:
                 logger.warning("location not found set empty string")
                 temp['OSAC_Location'] =  ""
             try:
-                events = re.search(r"Events?:\s*(.*?)\s*Actions? to Take:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                events = re.search(r"Events?\s*:\s*(.*?)\s*Actions? to Take\s*:", content_data, re.IGNORECASE | re.DOTALL).group(1)
                 temp['OSAC_Events'] = events
             except Exception as e:
                 logger.warning("events not found set empty string .")
                 temp['OSAC_Events']  = ""
 
             try:
-                actions_to_take = re.search(r"Actions? to Take:\s*(.*?)\s*Assistance:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                actions_to_take = re.search(r"Actions? to Take\s*:\s*(.*?)\s*Assistance\s*:", content_data, re.IGNORECASE | re.DOTALL).group(1)
                 temp['OSAC_Actions'] = actions_to_take
             except Exception as e:
                 logger.warning("actions not found set empty string .")
                 temp['OSAC_Actions']  = ""
             try:
-                assistance = re.search(r"Assistance:\s*(.*)", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                assistance = re.search(r"Assistance\s*:\s*(.*)", content_data, re.IGNORECASE | re.DOTALL).group(1)
                 temp['OSAC_Assistance'] = assistance
             except Exception as e:
                 logger.warning("assitance not found set empty string.")
@@ -408,7 +425,15 @@ SearchMore
             break
     def filter_already_scraped_data(self,):
         all_files = self.get_all_files_from_html_folder()
-        print(all_files)
+        all_ids = [i.replace(".html","") for i in all_files]
+        logger.info("filtering only links that is not  stored in database.")
+        links_container_dataset = []
+        for url in self.page_links_container:
+            id_ = self.extract_id(url)
+            if not id_ in all_ids:
+                links_container_dataset.append(url)
+        self.page_links_container = links_container_dataset
+        
     def save_csv_to_drive(self,) -> None:
         csv_data = self.osac_dataset
         self.write_csv_to_drive(file_name="osac.csv", data_list=csv_data, append=True)
