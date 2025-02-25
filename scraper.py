@@ -259,7 +259,7 @@ class OsacScraper(DriveManager):
             "TE": "trailers",
         })
         soup = BeautifulSoup(res.text, "lxml")
-
+        print(soup)
         # Extract cookies and verification code
         cookies_dict = requests.utils.dict_from_cookiejar(res.cookies)
         verification_code = soup.find("input", {"name": "__RequestVerificationToken"}).get("value")
