@@ -259,7 +259,6 @@ class OsacScraper(DriveManager):
             "TE": "trailers",
         })
         soup = BeautifulSoup(res.text, "lxml")
-        print(soup)
         # Extract cookies and verification code
         cookies_dict = requests.utils.dict_from_cookiejar(res.cookies)
         verification_code = soup.find("input", {"name": "__RequestVerificationToken"}).get("value")
@@ -380,9 +379,38 @@ SearchMore
     
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
-
     def clean_text(self, text):
-        return unicodedata.normalize("NFKC", text).strip()
+        text = unicodedata.normalize("NFKC", text).strip()
+        
+        # Regex pattern to match and remove the unwanted prefixes
+        pattern = r'^(?:Locations?|Events?|Actions?\s+to\s+Take|Assistances?)\s*:?\s*'
+        
+        return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
+    def extract_text_from_tag(self, start_tag):
+        """Extracts text after the given start tag until the next <strong> tag or closing </section> tag."""
+        if not start_tag:
+            return ""
+
+        content = []
+        current_element = start_tag.find_next()
+
+        while current_element:
+            # Stop at the next <strong> tag or when reaching the closing </section> tag
+            if current_element.name == "strong" or (hasattr(current_element, "find") and current_element.find("strong")):
+                break
+            if current_element.name == "section":  # Stop at the closing </section>
+                break
+
+            # Extract only text content
+            if isinstance(current_element, str):
+                content.append(current_element.strip())
+            elif hasattr(current_element, "get_text"):
+                content.append(current_element.get_text(strip=True))
+
+            current_element = current_element.find_next()
+
+        return self.clean_text(" ".join(content))
+
     def extract_details(self)-> None:
 
         total_length = len(self.page_links_container)
@@ -421,26 +449,34 @@ SearchMore
             temp['OSAC_URL'] = url
             
             try:
-                location = re.search(r"Locations?\s*:\s*(.*?)\s*Events?", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                location = self.extract_text_from_tag(soup.find("strong",string=re.compile(r"Locations?\s*:?", re.I)))
+                if len(location) < 1:
+                    logger.warning("location not found set empty string")
                 temp['OSAC_Location'] = location
             except Exception as e:
                 logger.warning("location not found set empty string")
                 temp['OSAC_Location'] =  ""
             try:
-                events = re.search(r"Events?\s*:\s*(.*?)\s*Actions? to Take\s*:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
+                if len(events) < 1:
+                    logger.warning("events not found set empty string .")
                 temp['OSAC_Events'] = events
             except Exception as e:
                 logger.warning("events not found set empty string .")
                 temp['OSAC_Events']  = ""
 
             try:
-                actions_to_take = re.search(r"Actions? to Take\s*:\s*(.*?)\s*Assistance\s*:", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
+                if len(actions_to_take) < 1:
+                    logger.warning("actions not found set empty string .")
                 temp['OSAC_Actions'] = actions_to_take
             except Exception as e:
                 logger.warning("actions not found set empty string .")
                 temp['OSAC_Actions']  = ""
             try:
-                assistance = re.search(r"Assistance\s*:\s*(.*)", content_data, re.IGNORECASE | re.DOTALL).group(1)
+                assistance = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Assistance\s*:?", re.I)))
+                if len(assistance) < 1:
+                    logger.warning("assitance not found set empty string.")
                 temp['OSAC_Assistance'] = assistance
             except Exception as e:
                 logger.warning("assitance not found set empty string.")
