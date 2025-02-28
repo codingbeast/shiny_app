@@ -338,6 +338,8 @@ SearchMore
 
             if page_number > 0:  # todo: Stop after 10 pages for debug
                 logger.info("page is more then 5 stopped ")
+                with open("links.txt","w") as f:
+                    f.write("\n".join(self.page_links_container))
                 break
             page_number += 1
 
@@ -393,11 +395,12 @@ SearchMore
 
         content = []
         current_element = start_tag.find_next()
-
+        content.append(start_tag.find_parent("p").get_text(strip=True))
         while current_element:
             # Stop at the next <strong> tag or when reaching the closing </section> tag
             if current_element.name == "strong" or (hasattr(current_element, "find") and current_element.find("strong")):
-                break
+                if "Assistance" not in start_tag.find_parent("p").get_text(strip=True):
+                    break
             if current_element.name == "section":  # Stop at the closing </section>
                 break
 
@@ -486,7 +489,7 @@ SearchMore
             #extract string from soup : add this in end to avoid other link extraction set preprocess to true if you want remove unwnatext text
             html_str = self.get_html_data(soup, preprocess = True)
             self.write_text_to_drive(file_name=html_filename,content=html_str)
-            break
+            #break
     def filter_already_scraped_data(self,):
         all_files = self.get_all_files_from_html_folder()
         all_ids = [i.replace(".html","") for i in all_files]
