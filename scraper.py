@@ -237,6 +237,32 @@ class OsacScraper(DriveManager):
         """Setter for verification code."""
         self._verification_code = value
 
+    def set_login_from_home_page(self,) -> None:
+        url = "https://www.osac.gov/UserAccount/Login"
+        email = "advrter%40gmail.com"
+        password = "Raj29956"
+        payload = f"__RequestVerificationToken={self.verification_code}&ReturnUrl=&Username={email}&Password={password}&RememberMe=true&RememberMe=false&X-Requested-With=XMLHttpRequest"
+        res = self.s.post(url, headers={
+            'Host': 'www.osac.gov',
+            'Content-Length': '258',
+            'Sec-Ch-Ua': '"Not;A=Brand";v="24", "Chromium";v="128"',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.120 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': '*/*',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Origin': 'https://www.osac.gov',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'Referer': 'https://www.osac.gov/',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Priority': 'u=1, i',
+            }, cookies=self.cookies,data=payload)
+        print(res.text)
+
     def set_cookie_from_home_page(self):
         """Method to fetch cookies and verification code from the home page."""
         logger.info("getting cookies and verification code from osac home page..")
@@ -267,6 +293,8 @@ class OsacScraper(DriveManager):
         self.cookies = cookies_dict
         self.verification_code = verification_code
         logger.info("cookies and verification code is stored.")
+        logger.info("login and storing session.")
+        #self.set_login_from_home_page()
     def get_boundry_data(self, page_number: int, ) -> str:
         # Multipart form-data body
         boundary = "----geckoformboundary6777d4edf039c309ea1f3ca47bf6aaa9"
@@ -346,7 +374,7 @@ SearchMore
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
     def getSoup(self,url) -> BeautifulSoup:
-        res = requests.get(url)
+        res = self.s.get(url)
         res.raise_for_status()
         soup = BeautifulSoup(res.text,"lxml")
         return soup
@@ -417,7 +445,6 @@ SearchMore
     def extract_details(self)-> None:
 
         total_length = len(self.page_links_container)
-        
         for index_, url in enumerate(self.page_links_container, start=1):
             logger.info(f"{index_} out of {total_length} : {url}")
             temp={}
@@ -435,6 +462,15 @@ SearchMore
             except Exception as e:
                 logger.critical("all data not found skiped")
                 self.error_urls.append({"url" : url})
+                temp['OSAC_ID'] =''
+                temp[' OSAC_Date'] = ''
+                temp['OSAC_Title'] = 'link is protected'
+                temp['OSAC_URL'] = url
+                temp['OSAC_Location'] = ''
+                temp['OSAC_Events'] = ''
+                temp['OSAC_Actions'] = ''
+                temp['OSAC_Assistance'] = ""
+                self.osac_dataset.append(temp)
                 continue
             temp['OSAC_ID'] = self.extract_id(url)
             try:
@@ -447,6 +483,15 @@ SearchMore
             except Exception as e:
                 logger.warning("title not found skiping ")
                 self.error_urls.append({"url" : url})
+                temp['OSAC_ID'] =''
+                temp[' OSAC_Date'] = ''
+                temp['OSAC_Title'] = 'link is protected'
+                temp['OSAC_URL'] = url
+                temp['OSAC_Location'] = ''
+                temp['OSAC_Events'] = ''
+                temp['OSAC_Actions'] = ''
+                temp['OSAC_Assistance'] = ""
+                self.osac_dataset.append(temp)
                 continue
             
             temp['OSAC_URL'] = url
