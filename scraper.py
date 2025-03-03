@@ -6,7 +6,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2 import service_account
 import io, re
-import csv
+import csv, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 from urllib.parse import urlparse
 import unicodedata
@@ -239,8 +240,8 @@ class OsacScraper(DriveManager):
 
     def set_login_from_home_page(self,) -> None:
         url = "https://www.osac.gov/UserAccount/Login"
-        email = "advrter%40gmail.com"
-        password = "Raj29956"
+        email = ""
+        password = ""
         payload = f"__RequestVerificationToken={self.verification_code}&ReturnUrl=&Username={email}&Password={password}&RememberMe=true&RememberMe=false&X-Requested-With=XMLHttpRequest"
         res = self.s.post(url, headers={
             'Host': 'www.osac.gov',
@@ -284,6 +285,7 @@ class OsacScraper(DriveManager):
             "Cache-Control": "no-cache",
             "TE": "trailers",
         })
+        res.raise_for_status()
         soup = BeautifulSoup(res.text, "lxml")
         # Extract cookies and verification code
         cookies_dict = requests.utils.dict_from_cookiejar(res.cookies)
@@ -334,7 +336,7 @@ false
 --{boundary}
 Content-Disposition: form-data; name="PageSize"
 
-20
+500
 --{boundary}
 Content-Disposition: form-data; name="actionType"
 
@@ -343,33 +345,87 @@ SearchMore
 """
         return body
 
-    def get_advisories(self,) -> bool:
-        # Send the request
-        page_number = 1
-        while True:
-            logger.info(f"gettting data from page : {page_number}")
-            response = requests.post(self.api_url, headers=self.get_header, cookies=self.cookies, data=self.get_boundry_data(page_number=page_number))
-            response.raise_for_status()
-            # Print the response
-            html = response.json()['viewHTML']
-            soup = BeautifulSoup(html,"lxml")
-            for link_container in soup.find_all("div", {"class" : "col-8 col-md-10 mss-content-item-details"}):
-                link = link_container.find("a").get("href",None)
-                date_str = link_container.find("div", {"class" : "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
-                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-                # Check if the date is older than 12 months
-                if date_obj < self.twelve_months_buffer_period:
-                    logger.info("data is older then buffer period ( 12 months) stopping the link collection.")
-                    return False  # Stop processing if date is older than 12 months
-                else:
-                    self.page_links_container.append(link)  # Add link to the container
 
-            if page_number > 0:  # todo: Stop after 10 pages for debug
-                logger.info("page is more then 5 stopped ")
-                with open("links.txt","w") as f:
-                    f.write("\n".join(self.page_links_container))
-                break
-            page_number += 1
+    def fetch_page_data(self, page_number):
+        """Fetch advisories from a single page with retry and timeout."""
+        logger.info(f"Fetching data from page: {page_number}")
+        
+        url = self.api_url
+        headers = self.get_header
+        cookies = self.cookies
+        data = self.get_boundry_data(page_number=page_number)
+        
+        max_retries = 3  # Number of retry attempts
+        backoff_factor = 2  # Delay factor for retries
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.post(url, headers=headers, cookies=cookies, data=data, timeout=15)
+                response.raise_for_status()  # Raise an exception for HTTP errors
+
+                html = response.json().get("viewHTML", "")
+                if not html:
+                    logger.warning(f"Page {page_number} returned empty HTML.")
+                    return None
+                
+                soup = BeautifulSoup(html, "lxml")
+                page_links = []
+
+                for link_container in soup.find_all("div", {"class": "col-8 col-md-10 mss-content-item-details"}):
+                    link = link_container.find("a").get("href", None)
+                    date_str = link_container.find("div", {"class": "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
+                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+
+                    if date_obj < self.twelve_months_buffer_period:
+                        logger.info(f"Page {page_number} contains outdated advisories. Stopping further collection.")
+                        return None  # Stop further processing if old data is found.
+
+                    page_links.append(link)
+
+                return page_links
+
+            except requests.exceptions.Timeout:
+                logger.warning(f"Timeout on page {page_number}, attempt {attempt}/{max_retries}")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching page {page_number}: {e}")
+                break  # Exit on non-timeout errors
+
+            time.sleep(backoff_factor * attempt)  # Exponential backoff delay
+
+        logger.error(f"Failed to fetch page {page_number} after {max_retries} attempts.")
+        return None
+
+
+    def get_advisories(self) -> bool:
+        """Main function to fetch advisories with parallel requests."""
+
+        # Check if links.txt exists and is not older than 1 day
+        if os.path.exists("links.txt"):
+            file_age = time.time() - os.path.getmtime("links.txt")
+            if file_age <= 86400:  # 86400 seconds = 1 day
+                with open("links.txt", "r", encoding="utf-8") as f:
+                    self.page_links_container = [i.strip() for i in f.readlines()]
+                return True
+
+        # If file is old or doesn't exist, fetch new advisories
+        max_pages = 59  # Adjust as needed
+        self.page_links_container = []  # Reset container
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_page = {executor.submit(self.fetch_page_data, page): page for page in range(1, max_pages + 1)}
+
+            for future in as_completed(future_to_page):
+                result = future.result()
+                if result is None:
+                    break  # Stop if outdated advisories are found.
+                self.page_links_container.extend(result)
+
+        # Save collected links
+        with open("links.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(self.page_links_container))
+
+        return True
+
 
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
@@ -550,6 +606,7 @@ SearchMore
         csv_data = self.osac_dataset
         self.write_csv_to_drive(file_name="osac.csv", data_list=csv_data, append=True)
         self.write_csv_to_drive(file_name="errors.csv", data_list=self.error_urls, append=True)
+
 if __name__ == "__main__":
     osac_scraper = OsacScraper()
     #set extract cookies from home to request api
