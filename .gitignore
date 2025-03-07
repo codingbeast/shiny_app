@@ -7,6 +7,8 @@ __pycache__/
 *.so
 doc
 links.txt
+output/
+osac.csv
 # Distribution / packaging
 .Python
 build/
