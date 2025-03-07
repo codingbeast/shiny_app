@@ -24,4 +24,4 @@ jobs:
       - name: Run Scraper with Secret Key
         env:
           MY_SECRET_KEY: ${{ secrets.MY_SECRET_KEY }}
-        run: python scraper.py
+        run: python scraper.py check
