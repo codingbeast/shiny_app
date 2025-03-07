@@ -6,15 +6,18 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2 import service_account
 import io, re
+import multiprocessing
 import csv, time
+import glob
+import multiprocessing
+from functools import partial
+import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 from urllib.parse import urlparse
 import unicodedata
 from urllib.parse import urlparse
-logger = log.logger
-
-
+from pathlib import Path
 
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -22,15 +25,25 @@ from google.oauth2 import service_account
 import io, os
 import csv, json
 
+SCRAPED_LOG_FILE_NAME = "already_scraped_links.txt"
+UPLOADED_DRIVE_LOG_FILE_NAME = "uploaded_to_drive.txt"
+DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME = "links.txt"
+EXTRACTED_DETAILS_CSV_FILE_NAME = "osac.csv"
+HTML_OUTPUT_DIR = "output"
+CSV_FOLDER_ID_DRIVE = "1NrmVf1DfAAqxkg72nFLCd4hwGciVVFbJ"
+HTML_FOLDER_ID_DRIVE = "1JnNAo9No8etBRoNKIFvviuiBXAZEeDzH"
+SERVICE_ACCOUNT_FILE = 'doc/service_account.json'
+
+logger = log.logger
+
 class DriveManager:
-    def __init__(self):
+    def __init__(self): 
         SCOPES = ['https://www.googleapis.com/auth/drive.file']
-        SERVICE_ACCOUNT_FILE = 'doc/service_account.json'
-
+        Path(HTML_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
         # Store folder IDs as instance variables
-        self.CSV_FOLDER_ID = "1NrmVf1DfAAqxkg72nFLCd4hwGciVVFbJ"
-        self.HTML_FOLDER_ID = "11Rm4t0tlYweXXxNjoYuXB7L0rVd-fILj"
-
+        self.CSV_FOLDER_ID = CSV_FOLDER_ID_DRIVE
+        self.HTML_FOLDER_ID = HTML_FOLDER_ID_DRIVE
+        
         secret_key_str = os.getenv("MY_SECRET_KEY")
         # Authenticate and build the Drive service
         if secret_key_str:
@@ -62,6 +75,7 @@ class DriveManager:
 
         file = self.drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         logger.info(f"html file '{file_name}' created successfully! File ID: {file.get('id')}")
+        self.uploaded_to_drive_log(file_name)
         return file.get('id')
 
     def write_csv_to_drive(self, file_name, data_list, folder_id=None, append=False):
@@ -116,7 +130,7 @@ class DriveManager:
         }
 
         # Upload the file
-        media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode("utf-8")), mimetype='text/csv')
+        media = MediaIoBaseUpload(io.BytesIO(csv_buffer.getvalue().encode("utf-8")), mimetype='text/csv', resumable=True)
         if file_id:
             # Update the existing file
             file = self.drive_service.files().update(fileId=file_id, media_body=media, fields='id').execute()
@@ -166,20 +180,30 @@ class DriveManager:
 
         return file.getvalue().decode("utf-8")
 
-    def get_all_files_from_html_folder(self):
-        """
-        Fetches all file names from the HTML folder and returns them as a list.
-        """
-        query = f"'{self.HTML_FOLDER_ID}' in parents and trashed=false"
-        results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get('files', [])
+    # def get_all_files_from_html_folder(self):
+    #     """
+    #     Fetches all file names from the HTML folder and returns them as a list.
+    #     """
+    #     query = f"'{self.HTML_FOLDER_ID}' in parents and trashed=false"
+    #     results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+    #     files = results.get('files', [])
 
-        if not files:
-            logger.info("No files found in the HTML folder.")
-            return []
+    #     if not files:
+    #         logger.info("No files found in the HTML folder.")
+    #         return []
 
-        file_names = [file['name'] for file in files]
-        return file_names
+    #     file_names = [file['name'] for file in files]
+    #     return file_names
+    def uploaded_to_drive_log(self, filename) -> None:
+        with open(UPLOADED_DRIVE_LOG_FILE_NAME,"a", encoding="utf-8") as f:
+            f.write(f"{os.path.basename(filename)}\n")
+    def get_all_uploaded_to_drive_log(self) -> list:
+        if os.path.exists(UPLOADED_DRIVE_LOG_FILE_NAME):
+            with open(UPLOADED_DRIVE_LOG_FILE_NAME,"r", encoding='utf-8') as f:
+                files = [i.strip() for i in f.readlines()]
+        else:
+            files = []
+        return files
 
 class OsacScraper(DriveManager):
     def __init__(self):
@@ -188,6 +212,7 @@ class OsacScraper(DriveManager):
         self._verification_code = None  # Private variable for verification code
         self._api_url = "https://www.osac.gov/Content/Search"
         self.page_links_container = []
+        self.total_results_found = 29115
         self.osac_dataset = []
         self.error_urls = []
         self.twelve_months_buffer_period = datetime.today() - timedelta(days=365)
@@ -290,7 +315,11 @@ class OsacScraper(DriveManager):
         # Extract cookies and verification code
         cookies_dict = requests.utils.dict_from_cookiejar(res.cookies)
         verification_code = soup.find("input", {"name": "__RequestVerificationToken"}).get("value")
-
+        try:
+            total_results = soup.find("span",{"data-pager" : "totalNumber"}).get("data-value")
+            self.total_results_found = int(total_results)
+        except:
+            pass
         # Use setters to update the values
         self.cookies = cookies_dict
         self.verification_code = verification_code
@@ -309,6 +338,10 @@ Content-Disposition: form-data; name="__RequestVerificationToken"
 Content-Disposition: form-data; name="SortOrderCode"
 
 0
+--{boundary}
+Content-Disposition: form-data; name="TotalCount"
+
+{self.total_results_found}
 --{boundary}
 Content-Disposition: form-data; name="CurrentPageNumber"
 
@@ -341,6 +374,10 @@ Content-Disposition: form-data; name="PageSize"
 Content-Disposition: form-data; name="actionType"
 
 SearchMore
+--{boundary}
+Content-Disposition: form-data; name="pageNumber"
+
+{page_number}
 --{boundary}--
 """
         return body
@@ -360,7 +397,7 @@ SearchMore
 
         for attempt in range(1, max_retries + 1):
             try:
-                response = requests.post(url, headers=headers, cookies=cookies, data=data, timeout=15)
+                response = requests.post(url, headers=headers, cookies=cookies, data=data, timeout=60*5)
                 response.raise_for_status()  # Raise an exception for HTTP errors
 
                 html = response.json().get("viewHTML", "")
@@ -373,12 +410,12 @@ SearchMore
 
                 for link_container in soup.find_all("div", {"class": "col-8 col-md-10 mss-content-item-details"}):
                     link = link_container.find("a").get("href", None)
-                    date_str = link_container.find("div", {"class": "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
-                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                    # date_str = link_container.find("div", {"class": "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
+                    # date_obj = datetime.strptime(date_str, "%m/%d/%Y")
 
-                    if date_obj < self.twelve_months_buffer_period:
-                        logger.info(f"Page {page_number} contains outdated advisories. Stopping further collection.")
-                        return None  # Stop further processing if old data is found.
+                    # if date_obj < self.twelve_months_buffer_period:
+                    #     logger.info(f"Page {page_number} contains outdated advisories. Stopping further collection.")
+                    #     return None  # Stop further processing if old data is found.
 
                     page_links.append(link)
 
@@ -400,10 +437,10 @@ SearchMore
         """Main function to fetch advisories with parallel requests."""
 
         # Check if links.txt exists and is not older than 1 day
-        if os.path.exists("links.txt"):
-            file_age = time.time() - os.path.getmtime("links.txt")
+        if os.path.exists(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME):
+            file_age = time.time() - os.path.getmtime(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME)
             if file_age <= 86400:  # 86400 seconds = 1 day
-                with open("links.txt", "r", encoding="utf-8") as f:
+                with open(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME, "r", encoding="utf-8") as f:
                     self.page_links_container = [i.strip() for i in f.readlines()]
                 return True
 
@@ -421,12 +458,40 @@ SearchMore
                 self.page_links_container.extend(result)
 
         # Save collected links
-        with open("links.txt", "w", encoding="utf-8") as f:
-            f.write("\n".join(self.page_links_container))
+        links = list(set(self.page_links_container))
+        with open(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME, "w", encoding="utf-8") as f:
+            f.write("\n".join(links))
 
         return True
+    def get_advisories_without_pool(self) -> bool:
+        """Main function to fetch advisories sequentially to ensure early stopping."""
+        # Check if links.txt exists and is not older than 1 day
+        if os.path.exists(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME):
+            file_age = time.time() - os.path.getmtime(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME)
+            if file_age <= 86400:  # 86400 seconds = 1 day
+                with open(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME, "r", encoding="utf-8") as f:
+                    self.page_links_container = [i.strip() for i in f.readlines()]
+                return True
 
+        # If file is old or doesn't exist, fetch new advisories
+        self.page_links_container = []  # Reset container
+        page_number = 1
+        max_pages = 59  # Adjust based on expected maximum pages
 
+        while page_number <= max_pages:
+            result = self.fetch_page_data(page_number)
+            if result is None:
+                # Stop pagination if outdated advisories are found
+                break
+            self.page_links_container.extend(result)
+            page_number += 1
+
+        # Save collected links
+        links = list(set(self.page_links_container))
+        with open(DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME, "w", encoding="utf-8") as f:
+            f.write("\n".join(links))
+
+        return True
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
     def getSoup(self,url) -> BeautifulSoup:
@@ -497,116 +562,193 @@ SearchMore
             current_element = current_element.find_next()
 
         return self.clean_text(" ".join(content))
-
-    def extract_details(self)-> None:
-
-        total_length = len(self.page_links_container)
-        for index_, url in enumerate(self.page_links_container, start=1):
-            logger.info(f"{index_} out of {total_length} : {url}")
-            temp={}
-            id_ = self.extract_id(url)
-            html_filename = f"{id_}.html"
-            try:
-                soup = self.getSoup(url)
-            except Exception as e:
-                logger.warning(f"getting error while processing {url} skiped")
-                self.error_urls.append({"url" : url})
-                continue
-            try:
-                content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
-                content_data = self.clean_text(content_data)
-            except Exception as e:
-                logger.critical("all data not found skiped")
-                self.error_urls.append({"url" : url})
-                temp['OSAC_ID'] =''
-                temp[' OSAC_Date'] = ''
-                temp['OSAC_Title'] = 'link is protected'
-                temp['OSAC_URL'] = url
-                temp['OSAC_Location'] = ''
-                temp['OSAC_Events'] = ''
-                temp['OSAC_Actions'] = ''
-                temp['OSAC_Assistance'] = ""
-                self.osac_dataset.append(temp)
-                continue
-            temp['OSAC_ID'] = self.extract_id(url)
-            try:
-                temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
-            except Exception as e:
-                logger.warning("date not found setting empty string")
-                temp['OSAC_Date'] = ""
-            try:
-                temp['OSAC_Title'] = soup.find("div",{"class" : "mss-page-title"}).get_text(strip=True)
-            except Exception as e:
-                logger.warning("title not found skiping ")
-                self.error_urls.append({"url" : url})
-                temp['OSAC_ID'] =''
-                temp[' OSAC_Date'] = ''
-                temp['OSAC_Title'] = 'link is protected'
-                temp['OSAC_URL'] = url
-                temp['OSAC_Location'] = ''
-                temp['OSAC_Events'] = ''
-                temp['OSAC_Actions'] = ''
-                temp['OSAC_Assistance'] = ""
-                self.osac_dataset.append(temp)
-                continue
-            
-            temp['OSAC_URL'] = url
-            
-            try:
-                location = self.extract_text_from_tag(soup.find("strong",string=re.compile(r"Locations?\s*:?", re.I)))
-                if len(location) < 1:
-                    logger.warning("location not found set empty string")
-                temp['OSAC_Location'] = location
-            except Exception as e:
-                logger.warning("location not found set empty string")
-                temp['OSAC_Location'] =  ""
-            try:
-                events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
-                if len(events) < 1:
-                    logger.warning("events not found set empty string .")
-                temp['OSAC_Events'] = events
-            except Exception as e:
-                logger.warning("events not found set empty string .")
-                temp['OSAC_Events']  = ""
-
-            try:
-                actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
-                if len(actions_to_take) < 1:
-                    logger.warning("actions not found set empty string .")
-                temp['OSAC_Actions'] = actions_to_take
-            except Exception as e:
-                logger.warning("actions not found set empty string .")
-                temp['OSAC_Actions']  = ""
-            try:
-                assistance = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Assistance\s*:?", re.I)))
-                if len(assistance) < 1:
-                    logger.warning("assitance not found set empty string.")
-                temp['OSAC_Assistance'] = assistance
-            except Exception as e:
-                logger.warning("assitance not found set empty string.")
-                temp['OSAC_Assistance'] = ""
-            #store to a dataset
-            self.osac_dataset.append(temp)
-            #extract string from soup : add this in end to avoid other link extraction set preprocess to true if you want remove unwnatext text
-            html_str = self.get_html_data(soup, preprocess = True)
-            self.write_text_to_drive(file_name=html_filename,content=html_str)
-            #break
-    def filter_already_scraped_data(self,):
-        all_files = self.get_all_files_from_html_folder()
-        all_ids = [i.replace(".html","") for i in all_files]
-        logger.info("filtering only links that is not  stored in database.")
-        links_container_dataset = []
-        for url in self.page_links_container:
-            id_ = self.extract_id(url)
-            if not id_ in all_ids:
-                links_container_dataset.append(url)
-        self.page_links_container = links_container_dataset
+    def append_dict_to_csv(self, file_path, data):
+        """
+        Appends a dictionary to a CSV file.
         
-    def save_csv_to_drive(self,) -> None:
-        csv_data = self.osac_dataset
-        self.write_csv_to_drive(file_name="osac.csv", data_list=csv_data, append=True)
-        self.write_csv_to_drive(file_name="errors.csv", data_list=self.error_urls, append=True)
+        :param file_path: Path to the CSV file.
+        :param data: Dictionary to append (keys as column names).
+        """
+        file_exists = os.path.isfile(file_path)
+        
+        with open(file_path, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=data.keys())
+            
+            # Write header if file is new
+            if not file_exists:
+                writer.writeheader()
+            
+            # Write data
+            writer.writerow(data)
 
+    def filter_already_scraped_data(self,):
+        if os.path.exists(SCRAPED_LOG_FILE_NAME):
+            with open(SCRAPED_LOG_FILE_NAME,"r") as file:
+                temp_links = [i.strip() for i in file.readlines() if i.strip()]
+        else:
+            temp_links = []
+            
+        links = [i for i in self.page_links_container if i not in temp_links]
+        self.page_links_container = links
+
+    def extract_details(self,index_, url):
+        logger.info(f"{index_} out of {len(self.page_links_container)} : {url}")
+        temp={}
+        id_ = self.extract_id(url)
+        html_filename = f"{id_}.html"
+        try:
+            soup = self.getSoup(url)
+        except Exception as e:
+            logger.warning(f"getting error while processing {url} skiped")
+            self.error_urls.append({"url" : url})
+            self.write_to_log(url)
+            return None
+        try:
+            content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
+            content_data = self.clean_text(content_data)
+        except Exception as e:
+            logger.critical("all data not found skiped")
+            self.error_urls.append({"url" : url})
+            self.write_to_log(url)
+            temp['OSAC_ID'] =''
+            temp[' OSAC_Date'] = ''
+            temp['OSAC_Title'] = 'link is protected'
+            temp['OSAC_URL'] = url
+            temp['OSAC_Location'] = ''
+            temp['OSAC_Events'] = ''
+            temp['OSAC_Actions'] = ''
+            temp['OSAC_Assistance'] = ""
+            #self.osac_dataset.append(temp)
+            self.append_dict_to_csv(file_path = "osac.csv", data=temp)
+            return None
+
+        temp['OSAC_ID'] = self.extract_id(url)
+        try:
+            temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
+        except Exception as e:
+            logger.warning("date not found setting empty string")
+            temp['OSAC_Date'] = ""
+        try:
+            temp['OSAC_Title'] = soup.find("div",{"class" : "mss-page-title"}).get_text(strip=True)
+        except Exception as e:
+            logger.warning("title not found skiping ")
+            self.error_urls.append({"url" : url})
+            self.write_to_log(url)
+            temp['OSAC_ID'] =''
+            temp[' OSAC_Date'] = ''
+            temp['OSAC_Title'] = 'link is protected'
+            temp['OSAC_URL'] = url
+            temp['OSAC_Location'] = ''
+            temp['OSAC_Events'] = ''
+            temp['OSAC_Actions'] = ''
+            temp['OSAC_Assistance'] = ""
+            #self.osac_dataset.append(temp)
+            self.append_dict_to_csv(file_path = "osac.csv", data=temp)
+            return None
+        
+        temp['OSAC_URL'] = url
+        
+        try:
+            location = self.extract_text_from_tag(soup.find("strong",string=re.compile(r"Locations?\s*:?", re.I)))
+            if len(location) < 1:
+                logger.warning("location not found set empty string")
+            temp['OSAC_Location'] = location
+        except Exception as e:
+            logger.warning("location not found set empty string")
+            temp['OSAC_Location'] =  ""
+        try:
+            events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
+            if len(events) < 1:
+                logger.warning("events not found set empty string .")
+            temp['OSAC_Events'] = events
+        except Exception as e:
+            logger.warning("events not found set empty string .")
+            temp['OSAC_Events']  = ""
+
+        try:
+            actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
+            if len(actions_to_take) < 1:
+                logger.warning("actions not found set empty string .")
+            temp['OSAC_Actions'] = actions_to_take
+        except Exception as e:
+            logger.warning("actions not found set empty string .")
+            temp['OSAC_Actions']  = ""
+        try:
+            assistance = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Assistance\s*:?", re.I)))
+            if len(assistance) < 1:
+                logger.warning("assitance not found set empty string.")
+            temp['OSAC_Assistance'] = assistance
+        except Exception as e:
+            logger.warning("assitance not found set empty string.")
+            temp['OSAC_Assistance'] = ""
+        #store to a dataset
+        #self.osac_dataset.append(temp)
+        self.append_dict_to_csv(file_path = EXTRACTED_DETAILS_CSV_FILE_NAME, data=temp)
+        #extract string from soup : add this in end to avoid other link extraction set preprocess to true if you want remove unwnatext text
+        html_str = self.get_html_data(soup, preprocess = True)
+        self.write_to_file(file_name=html_filename,content=html_str)
+        self.write_to_log(url)
+        #break
+    def extract_details_runner(self):
+        total_length = len(self.page_links_container)
+        logger.info(f"total links are {total_length}") 
+        for index_, url in enumerate(self.page_links_container,start=1):
+            self.extract_details(index_=index_, url=url)
+    def extract_details_worker(self, args):
+        """Helper function to unpack arguments and call extract_details."""
+        self, index_, url = args
+        self.extract_details(index_=index_, url=url)
+
+    def extract_details_runner(self):
+        total_length = len(self.page_links_container)
+        logger.info(f"Total links are {total_length}")
+
+        with multiprocessing.Pool(processes=5) as pool:
+            pool.map(self.extract_details_worker, [(self, index_, url) for index_, url in enumerate(self.page_links_container, start=1)])
+    def write_to_file(self, file_name, content) -> None:
+        filename_path = os.path.join("output", file_name)
+        with open(filename_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    def write_to_log(self, url) -> bool:
+        with open(SCRAPED_LOG_FILE_NAME,"a", encoding="utf-8") as f:
+            f.write(f"{url}\n")
+        return True
+
+    def upload_single_file(self, file_path, write_text_to_drive):
+        """Helper function to upload a single file to Google Drive."""
+        try:
+            with open(file_path, "r", encoding="utf-8") as reader:
+                content = reader.read()
+            self.write_text_to_drive(file_name=os.path.basename(file_path), content=content)
+            return f"Uploaded: {file_path}"
+        except Exception as e:
+            return f"Error uploading {file_path}: {e}"
+        
+    def upload_data_to_drive(self) -> bool:
+        not_uploaded_files = self.filter_already_scraped_data_from_drive()
+        logger.info(f"Starting upload for {len(not_uploaded_files)} files")
+        
+        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+            upload_func = partial(self.upload_single_file, write_text_to_drive=self.write_text_to_drive)
+            results = pool.map(upload_func, not_uploaded_files)
+        
+        for result in results:
+            logger.info(result)
+        
+        return True
+    def filter_already_scraped_data_from_drive(self,):
+        all_files = self.get_all_uploaded_to_drive_log()
+        all_html_files_from_local = [i for i in glob.glob("output/*html")]
+        not_upload_html_files = [i for i in all_html_files_from_local if os.path.basename(i) not in all_files]
+        logger.info(f"filtering only links that is not  stored in database. {len(not_upload_html_files)}")
+        return not_upload_html_files
+    
+    def save_csv_to_drive(self,) -> None:
+        df = pd.read_csv(EXTRACTED_DETAILS_CSV_FILE_NAME)
+        csv_data = df.to_dict(orient="records")
+        self.write_csv_to_drive(file_name=EXTRACTED_DETAILS_CSV_FILE_NAME, data_list=csv_data, append=False)
+        #self.write_csv_to_drive(file_name="errors.csv", data_list=self.error_urls, append=True)
+        
 if __name__ == "__main__":
     osac_scraper = OsacScraper()
     #set extract cookies from home to request api
@@ -614,12 +756,12 @@ if __name__ == "__main__":
 
     #get all links from search page (12 months buffer time)
     osac_scraper.get_advisories()
-
     #check if already data availble inside our drive folder and remove links if already available 
     osac_scraper.filter_already_scraped_data()
 
     #extract details and save html in drive
-    osac_scraper.extract_details()
+    osac_scraper.extract_details_runner()
 
-    #save extracted data to drive in csv format.
+    osac_scraper.upload_data_to_drive()
+
     osac_scraper.save_csv_to_drive()
