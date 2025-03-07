@@ -7,7 +7,7 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2 import service_account
 import io, re
 import multiprocessing
-import csv, time
+import csv, time, sys
 import glob
 import multiprocessing
 from functools import partial
@@ -29,6 +29,7 @@ SCRAPED_LOG_FILE_NAME = "already_scraped_links.txt"
 UPLOADED_DRIVE_LOG_FILE_NAME = "uploaded_to_drive.txt"
 DOWNLOADED_LINKS_FROM_PAGINATION_LOG_FILE_NAME = "links.txt"
 EXTRACTED_DETAILS_CSV_FILE_NAME = "osac.csv"
+LOG_FILE_NAME_FOR_DRIVE_FLAG = "error.txt"
 HTML_OUTPUT_DIR = "output"
 CSV_FOLDER_ID_DRIVE = "1NrmVf1DfAAqxkg72nFLCd4hwGciVVFbJ"
 HTML_FOLDER_ID_DRIVE = "1JnNAo9No8etBRoNKIFvviuiBXAZEeDzH"
@@ -77,7 +78,51 @@ class DriveManager:
         logger.info(f"html file '{file_name}' created successfully! File ID: {file.get('id')}")
         self.uploaded_to_drive_log(file_name)
         return file.get('id')
+    def find_file_in_drive(self, file_name, folder_id=None):
+            """
+            Searches for a file by name in the specified Google Drive folder.
+            Returns the file ID if found, else None.
+            """
+            if folder_id is None:
+                folder_id = self.CSV_FOLDER_ID
 
+            query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
+            response = self.drive_service.files().list(q=query, fields="files(id)").execute()
+            files = response.get("files", [])
+            return files[0]["id"] if files else None
+
+    def write_or_replace_text_to_drive(self, file_name, content, folder_id=None):
+        """
+        Writes a text file to Google Drive, replacing it if it already exists.
+        """
+        if folder_id is None:
+            folder_id = self.CSV_FOLDER_ID
+
+        existing_file_id = self.find_file_in_drive(file_name, folder_id)
+        if existing_file_id:
+            self.drive_service.files().delete(fileId=existing_file_id).execute()
+            logger.info(f"Existing file '{file_name}' deleted successfully.")
+
+        return self.write_text_to_drive(file_name, content, folder_id)
+    def get_text_from_drive(self, file_name, folder_id=None):
+            """
+            Retrieves the content of a text file from Google Drive by name.
+            Returns the content as a string or None if the file is not found.
+            """
+            if folder_id is None:
+                folder_id = self.CSV_FOLDER_ID
+
+            file_id = self.find_file_in_drive(file_name, folder_id)
+            if not file_id:
+                logger.warning(f"File '{file_name}' not found in Drive.")
+                return None
+
+            request = self.drive_service.files().get_media(fileId=file_id)
+            file_stream = io.BytesIO()
+            downloader = MediaIoBaseUpload(file_stream, mimetype='text/plain')
+            request.execute()
+            file_stream.seek(0)
+            return file_stream.read().decode("utf-8")  # Return content as a string
     def write_csv_to_drive(self, file_name, data_list, folder_id=None, append=False):
         """
         Creates or appends to a CSV file on Google Drive and writes a list of dictionaries to it.
@@ -534,7 +579,7 @@ Content-Disposition: form-data; name="pageNumber"
         text = unicodedata.normalize("NFKC", text).strip()
         
         # Regex pattern to match and remove the unwanted prefixes
-        pattern = r'^(?:Locations?|Events?|Actions?\s+to\s+Take|Assistances?)\s*:?\s*'
+        pattern = r'\s*(?:Locations?|Location|Events?|Event|Actions?\s+to\s+Take|Assistances?)\s*:?\s*'
         
         return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
     def extract_text_from_tag(self, start_tag):
@@ -750,18 +795,49 @@ Content-Disposition: form-data; name="pageNumber"
         #self.write_csv_to_drive(file_name="errors.csv", data_list=self.error_urls, append=True)
         
 if __name__ == "__main__":
+    
     osac_scraper = OsacScraper()
+    
+    args = sys.argv[1:]
+    if len(args) > 0:
+        if args[0] == "check":
+            content = osac_scraper.get_text_from_drive(LOG_FILE_NAME_FOR_DRIVE_FLAG)
+            if content != None and len(content) > 1:
+                assert False, "Error detected while running"
+            else:
+                sys.exit()
+    error_logger = []
+
     #set extract cookies from home to request api
-    osac_scraper.set_cookie_from_home_page()
-
+    try:
+        osac_scraper.set_cookie_from_home_page()
+    except Exception as e:
+        error_logger.append(e)
+        
     #get all links from search page (12 months buffer time)
-    osac_scraper.get_advisories()
+    try:
+        osac_scraper.get_advisories()
+    except Exception as e:
+        error_logger.append(e)
     #check if already data availble inside our drive folder and remove links if already available 
-    osac_scraper.filter_already_scraped_data()
-
+    try:
+        osac_scraper.filter_already_scraped_data()
+    except Exception as e:
+        error_logger.append(e)
     #extract details and save html in drive
-    osac_scraper.extract_details_runner()
+    try:
+        osac_scraper.extract_details_runner()
+    except Exception as e:
+        error_logger.append(e)
 
-    osac_scraper.upload_data_to_drive()
-
-    osac_scraper.save_csv_to_drive()
+    try:
+        osac_scraper.upload_data_to_drive()
+    except Exception as e:
+        error_logger.append(e)
+    try:
+        osac_scraper.save_csv_to_drive()
+    except Exception as e:
+        error_logger.append(e)
+    final_error = "\n".join(error_logger)
+    
+    osac_scraper.write_or_replace_text_to_drive(file_name=LOG_FILE_NAME_FOR_DRIVE_FLAG,content=final_error )
