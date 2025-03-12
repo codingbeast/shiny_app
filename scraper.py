@@ -635,7 +635,24 @@ Content-Disposition: form-data; name="pageNumber"
             
         links = [i for i in self.page_links_container if i not in temp_links]
         self.page_links_container = links
+    def extract_words_before_colon(self,text):
+        ignore_list = {"https","http","phone","email", "facebook", "twitter","website","emergencies","tel"}
+        if ignore_list is None:
+            ignore_list = set()  # Default to an empty set if no ignore list is provided
 
+        lines = text.splitlines()  # Split text into separate lines
+        extracted_words = []
+
+        for line in lines:
+            if ':' in line:  # Ensure colon is present in the line
+                # Match up to 3 words before the first colon, keeping the colon in the result
+                match = re.match(r'^([\w]+(?:\s+[\w]+){0,2})\s*(:)', line)
+                if match:
+                    extracted_text = match.group(1)  # Extract matched words before colon
+                    if extracted_text.lower() not in ignore_list:  # Check against ignore list
+                        extracted_words.append(extracted_text + match.group(2))  # Keep words + colon
+
+        return extracted_words
     def extract_details(self,index_, url):
         logger.info(f"{index_} out of {len(self.page_links_container)} : {url}")
         temp={}
@@ -649,8 +666,9 @@ Content-Disposition: form-data; name="pageNumber"
             self.write_to_log(url)
             return None
         try:
-            content_data = soup.find("div", {"class" :"mss-content-listitem"}).get_text(separator=" ",strip=True)
-            content_data = self.clean_text(content_data)
+            content_data = soup.find("div", {"class": "mss-content-listitem"})
+            content_data = [i.get_text(separator="\n", strip=True) for i in content_data.find_all("p")]
+            content_data = "\n".join(content_data).splitlines()
         except Exception as e:
             logger.critical("all data not found skiped")
             self.error_urls.append({"url" : url})
@@ -666,7 +684,8 @@ Content-Disposition: form-data; name="pageNumber"
             #self.osac_dataset.append(temp)
             self.append_dict_to_csv(file_path = "osac.csv", data=temp)
             return None
-
+        extracted_all_text = "\n".join(content_data)
+        extracted_keyword_before_colon = '|'.join(map(re.escape, self.extract_words_before_colon(extracted_all_text)))  # Escape special characters
         temp['OSAC_ID'] = self.extract_id(url)
         try:
             temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
@@ -680,7 +699,7 @@ Content-Disposition: form-data; name="pageNumber"
             self.error_urls.append({"url" : url})
             self.write_to_log(url)
             temp['OSAC_ID'] =''
-            temp[' OSAC_Date'] = ''
+            temp['OSAC_Date'] = ''
             temp['OSAC_Title'] = 'link is protected'
             temp['OSAC_URL'] = url
             temp['OSAC_Location'] = ''
@@ -696,7 +715,9 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             location = self.extract_text_from_tag(soup.find("strong",string=re.compile(r"Locations?\s*:?", re.I)))
             if len(location) < 1:
-                logger.warning("location not found set empty string")
+                location = re.search(rf'\bLocations?\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
+                if len(location) < 1:
+                    logger.warning("location not found set empty string")
             temp['OSAC_Location'] = location
         except Exception as e:
             logger.warning("location not found set empty string")
@@ -704,6 +725,7 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
             if len(events) < 1:
+                
                 logger.warning("events not found set empty string .")
             temp['OSAC_Events'] = events
         except Exception as e:
@@ -713,7 +735,9 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
             if len(actions_to_take) < 1:
-                logger.warning("actions not found set empty string .")
+                actions_to_take = self.extract_text_from_tag(soup.find("span", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
+                if len(actions_to_take) < 1:
+                    logger.warning("actions not found set empty string .")
             temp['OSAC_Actions'] = actions_to_take
         except Exception as e:
             logger.warning("actions not found set empty string .")
