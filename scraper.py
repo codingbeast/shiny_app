@@ -572,7 +572,9 @@ Content-Disposition: form-data; name="pageNumber"
                 if found:
                     found.decompose() if isinstance(found, str) else found  
         return str(soup)
-    
+    def clean_text_2(self, text):
+        text = unicodedata.normalize("NFKC", text).strip()
+        return text
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
     def clean_text(self, text):
@@ -667,7 +669,7 @@ Content-Disposition: form-data; name="pageNumber"
             return None
         try:
             content_data = soup.find("div", {"class": "mss-content-listitem"})
-            content_data = [i.get_text(separator="\n", strip=True) for i in content_data.find_all("p")]
+            content_data = [self.clean_text_2(i.get_text(separator="\n", strip=True)) for i in content_data.find_all("p")]
             content_data = "\n".join(content_data).splitlines()
         except Exception as e:
             logger.critical("all data not found skiped")
@@ -725,8 +727,9 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
             if len(events) < 1:
-                
-                logger.warning("events not found set empty string .")
+                events = re.search(rf'\bEvents?\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
+                if len(events) < 1:
+                    logger.warning("events not found set empty string .")
             temp['OSAC_Events'] = events
         except Exception as e:
             logger.warning("events not found set empty string .")
@@ -735,7 +738,7 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
             if len(actions_to_take) < 1:
-                actions_to_take = self.extract_text_from_tag(soup.find("span", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
+                actions_to_take =re.search(rf'\bActions?\s*to\s*Take\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
                 if len(actions_to_take) < 1:
                     logger.warning("actions not found set empty string .")
             temp['OSAC_Actions'] = actions_to_take
@@ -745,7 +748,9 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             assistance = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Assistance\s*:?", re.I)))
             if len(assistance) < 1:
-                logger.warning("assitance not found set empty string.")
+                assistance = re.search(rf'\bAssistance\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
+                if len(assistance) < 1:
+                    logger.warning("assitance not found set empty string.")
             temp['OSAC_Assistance'] = assistance
         except Exception as e:
             logger.warning("assitance not found set empty string.")
