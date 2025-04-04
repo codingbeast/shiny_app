@@ -667,11 +667,53 @@ Content-Disposition: form-data; name="pageNumber"
                 return word
 
         return None  # Return None if no match is found
+    def extract_section(self, content_data, start_header, all_headers):
+        # Escape all headers for regex
+        other_headers = [re.escape(h) for h in all_headers if h != start_header]
+        
+        # Build the regex pattern
+        if other_headers:
+            # Pattern to match until next header OR end
+            pattern = rf"{re.escape(start_header)}(.*?)(?={'|'.join(other_headers)}|\Z)"
+        else:
+            # Pattern to match until end only
+            pattern = rf"{re.escape(start_header)}(.*?)(?=\Z)"
+        
+        # Search with DOTALL flag (matches across newlines)
+        match = re.search(pattern, content_data, re.DOTALL)
+        
+        return match.group(1).strip().lstrip(':') .strip() if match else None
+    def keyword_extractor(self, soup : BeautifulSoup):
+        content_data = soup.find("div", {"class": "mss-content-listitem"})
+        content_data = [self.clean_text_2(i.get_text(separator="\n", strip=True)) for i in soup.find_all('p') + soup.find_all('ul') + soup.find_all('strong')]
+        extracted_all_text = "\n".join(content_data)
+        default_selections = ["location", "event", "Assistance","action",]
+        extracted_keyword_before_colon = self.extract_words_before_colon(extracted_all_text)
+        matched_keywords = [word for word in extracted_keyword_before_colon if any(re.search(fr"\b{d}\w*\b", word, re.IGNORECASE) for d in default_selections)]
+        matched_keywords = list(set(matched_keywords))
+        matched_keywords_from_strong = self.extract_keywords_from_strong(soup=soup)
+        total_keywords = matched_keywords + matched_keywords_from_strong
+        total_keywords = list(set(total_keywords))
+        return total_keywords
+    def extract_keywords_from_strong(self, soup: BeautifulSoup):
+        default_selections = ["location", "event", "assistance", "action"]
+        pattern = re.compile(
+            r'^(' + '|'.join(default_selections) + r')[s:_-]*', 
+            flags=re.IGNORECASE
+        )
 
+        from_strong_selection = []
+        for strong_tag in soup.find_all("strong"):
+            # Check if the parent is a <p> tag and this is the first child
+            if strong_tag.parent.name == "p" and strong_tag is strong_tag.parent.find(recursive=False):
+                text = strong_tag.get_text(strip=True)
+                if pattern.match(text.lower()):
+                    from_strong_selection.append(text)
+        
+        return from_strong_selection
     def extract_details(self,index_, url):
         logger.info(f"{index_} out of {len(self.page_links_container)} : {url}")
         temp={}
-        default_selections = ["location", "event", "Assistance","action",]
         id_ = self.extract_id(url)
         html_filename = f"{id_}.html"
         try:
