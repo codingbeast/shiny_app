@@ -574,7 +574,8 @@ Content-Disposition: form-data; name="pageNumber"
         return str(soup)
     def clean_text_2(self, text):
         text = unicodedata.normalize("NFKC", text).strip()
-        return text
+        clean_text = re.sub(r"[^\x00-\x7F]+", "", text) 
+        return clean_text.strip()
     def extract_id(self, url):
         return url.rstrip('/').split('/')[-1]  # Get last part of the URL
     def clean_text(self, text):
@@ -637,7 +638,7 @@ Content-Disposition: form-data; name="pageNumber"
             
         links = [i for i in self.page_links_container if i not in temp_links]
         self.page_links_container = links
-    def extract_words_before_colon(self,text):
+    def extract_words_before_colon(self, text):
         ignore_list = {"https","http","phone","email", "facebook", "twitter","website","emergencies","tel"}
         if ignore_list is None:
             ignore_list = set()  # Default to an empty set if no ignore list is provided
@@ -655,9 +656,22 @@ Content-Disposition: form-data; name="pageNumber"
                         extracted_words.append(extracted_text + match.group(2))  # Keep words + colon
 
         return extracted_words
+    def extract_first_matching_keyword(self, extracted_keywords, default_selections):
+        # Convert default selections to lowercase for case-insensitive matching
+        default_selections_lower = [d.lower() for d in default_selections]
+
+        # Check for a match and return the first matched keyword
+        for word in extracted_keywords:
+            # Check if any default selection is part of the word (case-insensitive)
+            if any(re.search(fr"\b{d}\w*\b", word.lower(), re.IGNORECASE) for d in default_selections_lower):
+                return word
+
+        return None  # Return None if no match is found
+
     def extract_details(self,index_, url):
         logger.info(f"{index_} out of {len(self.page_links_container)} : {url}")
         temp={}
+        default_selections = ["location", "event", "Assistance","action",]
         id_ = self.extract_id(url)
         html_filename = f"{id_}.html"
         try:
@@ -669,8 +683,8 @@ Content-Disposition: form-data; name="pageNumber"
             return None
         try:
             content_data = soup.find("div", {"class": "mss-content-listitem"})
-            content_data = [self.clean_text_2(i.get_text(separator="\n", strip=True)) for i in content_data.find_all("p")]
-            content_data = "\n".join(content_data).splitlines()
+            content_data = [self.clean_text_2(i.get_text(separator="\n", strip=True)) for i in soup.find_all('p') + soup.find_all('ul') + soup.find_all('strong')]
+            extracted_all_text = "\n".join(content_data)
         except Exception as e:
             logger.critical("all data not found skiped")
             self.error_urls.append({"url" : url})
