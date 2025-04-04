@@ -725,8 +725,8 @@ Content-Disposition: form-data; name="pageNumber"
             return None
         try:
             content_data = soup.find("div", {"class": "mss-content-listitem"})
-            content_data = [self.clean_text_2(i.get_text(separator="\n", strip=True)) for i in soup.find_all('p') + soup.find_all('ul') + soup.find_all('strong')]
-            extracted_all_text = "\n".join(content_data)
+            content_data = self.clean_text_2(content_data.get_text(separator="\n", strip=True))
+            keywords_ = self.keyword_extractor(soup = soup)
         except Exception as e:
             logger.critical("all data not found skiped")
             self.error_urls.append({"url" : url})
@@ -742,8 +742,10 @@ Content-Disposition: form-data; name="pageNumber"
             #self.osac_dataset.append(temp)
             self.append_dict_to_csv(file_path = "osac.csv", data=temp)
             return None
-        extracted_all_text = "\n".join(content_data)
-        extracted_keyword_before_colon = '|'.join(map(re.escape, self.extract_words_before_colon(extracted_all_text)))  # Escape special characters
+        location_keyword = self.extract_first_matching_keyword(keywords_,[ "location"])
+        event_keyword = self.extract_first_matching_keyword(keywords_,["event"])
+        action_to_take_keyword = self.extract_first_matching_keyword(keywords_, ["action"])
+        assistance_keyword = self.extract_first_matching_keyword(keywords_, ["assistance"])
         temp['OSAC_ID'] = self.extract_id(url)
         try:
             temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
@@ -771,42 +773,26 @@ Content-Disposition: form-data; name="pageNumber"
         temp['OSAC_URL'] = url
         
         try:
-            location = self.extract_text_from_tag(soup.find("strong",string=re.compile(r"Locations?\s*:?", re.I)))
-            if len(location) < 1:
-                location = re.search(rf'\bLocations?\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
-                if len(location) < 1:
-                    logger.warning("location not found set empty string")
+            location = self.extract_section(content_data, location_keyword, keywords_)
             temp['OSAC_Location'] = location
         except Exception as e:
             logger.warning("location not found set empty string")
             temp['OSAC_Location'] =  ""
         try:
-            events = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Events?\s*:?", re.I)))
-            if len(events) < 1:
-                events = re.search(rf'\bEvents?\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
-                if len(events) < 1:
-                    logger.warning("events not found set empty string .")
+            events = self.extract_section(content_data, event_keyword, keywords_)
             temp['OSAC_Events'] = events
         except Exception as e:
             logger.warning("events not found set empty string .")
             temp['OSAC_Events']  = ""
 
         try:
-            actions_to_take = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Actions?\s*to\s*Take\s*:?", re.I)))
-            if len(actions_to_take) < 1:
-                actions_to_take =re.search(rf'\bActions?\s*to\s*Take\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
-                if len(actions_to_take) < 1:
-                    logger.warning("actions not found set empty string .")
+            actions_to_take = self.extract_section(content_data, action_to_take_keyword, keywords_)
             temp['OSAC_Actions'] = actions_to_take
         except Exception as e:
             logger.warning("actions not found set empty string .")
             temp['OSAC_Actions']  = ""
         try:
-            assistance = self.extract_text_from_tag(soup.find("strong", string=re.compile(r"Assistance\s*:?", re.I)))
-            if len(assistance) < 1:
-                assistance = re.search(rf'\bAssistance\s*:\s*(.*?)\b({extracted_keyword_before_colon})', extracted_all_text, re.DOTALL).group(1).strip()
-                if len(assistance) < 1:
-                    logger.warning("assitance not found set empty string.")
+            assistance = self.extract_section(content_data, assistance_keyword, keywords_)
             temp['OSAC_Assistance'] = assistance
         except Exception as e:
             logger.warning("assitance not found set empty string.")
