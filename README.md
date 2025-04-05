@@ -183,7 +183,15 @@ pip install -r requirements.txt
 
 ```bash
 python scraper.py
+```
 
+## Scheduled Execution with Cron
 
+### Option 1: Using scraper.sh Script
 
+1. Make it executable `scraper.sh`:
 
+```bash
+chmod +x scraper.sh
+./scraper.sh
+```
