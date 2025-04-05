@@ -455,12 +455,12 @@ Content-Disposition: form-data; name="pageNumber"
 
                 for link_container in soup.find_all("div", {"class": "col-8 col-md-10 mss-content-item-details"}):
                     link = link_container.find("a").get("href", None)
-                    # date_str = link_container.find("div", {"class": "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
-                    # date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                    date_str = link_container.find("div", {"class": "mss-content-item-datetype"}).get_text(strip=True).split("|")[0].strip()
+                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
 
-                    # if date_obj < self.twelve_months_buffer_period:
-                    #     logger.info(f"Page {page_number} contains outdated advisories. Stopping further collection.")
-                    #     return None  # Stop further processing if old data is found.
+                    if date_obj < self.twelve_months_buffer_period:
+                        logger.info(f"Page {page_number} contains outdated advisories. Stopping further collection.")
+                        return None  # Stop further processing if old data is found.
 
                     page_links.append(link)
 
