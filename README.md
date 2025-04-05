@@ -136,7 +136,7 @@ osac/
 └── csv/
 ```
 
-1. take the ids from both html and csv folder url example <https://drive.google.com/drive/u/0/folders/1JnNAo9No8etBRoNKIFvviuiBXAZEeDzH>
+1. take the ids from both html and html folder url example <https://drive.google.com/drive/u/0/folders/1JnNAo9No8etBRoNKIFvviuiBXAZEeDzH>
 2. 1JnNAo9No8etBRoNKIFvviuiBXAZEeDzH is your id.
 3. update the scraper.py to use new google drive folder id
 
