@@ -4,3 +4,4 @@ mycolorlogger==0.8
 protobuf==5.29.3
 Requests==2.32.3
 lxml
+pandas
