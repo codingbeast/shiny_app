@@ -887,7 +887,7 @@ if __name__ == "__main__":
         
     #get all links from search page (12 months buffer time)
     try:
-        osac_scraper.get_advisories()
+        osac_scraper.get_advisories_without_pool()
     except Exception as e:
         error_logger.append(e)
     #check if already data availble inside our drive folder and remove links if already available 
