@@ -732,7 +732,7 @@ Content-Disposition: form-data; name="pageNumber"
             self.error_urls.append({"url" : url})
             self.write_to_log(url)
             temp['OSAC_ID'] =''
-            temp[' OSAC_Date'] = ''
+            temp['OSAC_Date'] = ''
             temp['OSAC_Title'] = 'link is protected'
             temp['OSAC_URL'] = url
             temp['OSAC_Location'] = ''
@@ -748,7 +748,7 @@ Content-Disposition: form-data; name="pageNumber"
         assistance_keyword = self.extract_first_matching_keyword(keywords_, ["assistance"])
         temp['OSAC_ID'] = self.extract_id(url)
         try:
-            temp[' OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
+            temp['OSAC_Date'] = soup.find("div", {"class" : "col-md-12 mss-content-datetype-container"}).get_text(strip=True).split("|")[0].strip()
         except Exception as e:
             logger.warning("date not found setting empty string")
             temp['OSAC_Date'] = ""
