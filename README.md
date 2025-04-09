@@ -177,6 +177,8 @@ cd path/to/your/project
 
 # Install all required packages
 pip install -r requirements.txt
+
+python -m spacy download en_core_web_sm
 ```
 
 ### Run main script
