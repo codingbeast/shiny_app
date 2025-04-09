@@ -119,13 +119,13 @@ class OSACDateParser:
 class OSACDateCSVProcessor(OSACDateParser):
     """Adds CSV handling while keeping date parsing logic separate"""
 
-    def __init__(self, csv_path: str, csv_output_path : str):
+    def __init__(self, df : pd.DataFrame):
         super().__init__()
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"CSV file not found: {csv_path}")
-        self.df = pd.read_csv(csv_path)
+        # if not os.path.exists(csv_path):
+        #     raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        self.df = df
         self.df.columns = self.df.columns.str.strip()
-        self.csv_output_path = csv_output_path
+        # self.csv_output_path = csv_output_path
 
     def process_csv(self) -> pd.DataFrame:
         """Processes the loaded CSV and adds date column"""
@@ -138,8 +138,10 @@ class OSACDateCSVProcessor(OSACDateParser):
     @property
     def extract(self) -> None:
         df_with_dates = self.process_csv()
-        df_with_dates.to_csv(self.csv_output_path)
+        return df_with_dates
+        #df_with_dates.to_csv(self.csv_output_path)
         
 if __name__ == "__main__":
     
-    processor = OSACDateCSVProcessor("osac.csv","osac.csv" ).extract
+    df_with_dates = OSACDateCSVProcessor().extract
+    print(df_with_dates)
