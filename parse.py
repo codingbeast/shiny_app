@@ -2,6 +2,7 @@
 import pandas as pd
 import os
 from date import OSACDateCSVProcessor
+from country import OSACCountryProcessor
 
 
 class DataParser:
@@ -18,13 +19,15 @@ class DataParser:
         return self.df
     
     def save_df(self, df : pd.DataFrame) -> None:
+        df = df[['OSAC_Title', "country"]]
         df.to_csv(self.csv_output_path,index=False, encoding='utf-8')
 
 if __name__ == "__main__":
-    data_parser = DataParser("osac.csv","osac.csv")
+    data_parser = DataParser("osac.csv","osac_test.csv")
     df = data_parser.get_df
     df_with_date = OSACDateCSVProcessor(df).extract
-    print(df_with_date)
+    df_with_country = OSACCountryProcessor(df_with_date).extract
+    data_parser.save_df(df_with_country)
 
     
 
