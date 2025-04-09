@@ -100,11 +100,22 @@ class OSACCountryProcessor(OSACCountryParser):
     def __init__(self, df: pd.DataFrame):
         super().__init__()
         pandarallel.initialize()
-        self.df = df
+        self.df = df.copy()
         
     @property
     def extract(self) -> pd.DataFrame:
-        self.df['country'] = self.df['OSAC_Title'].parallel_apply(
-            lambda x: self.parse_country(x) or ""
-        )
-        return self.df
+        # Initialize country column if it doesn't exist
+        if 'country' not in self.df.columns:
+            self.df['country'] = ''
+        
+        # Create mask for rows needing processing
+        needs_processing = self.df['country'].isna() | (self.df['country'] == '')
+        
+        # Only process the rows that need it
+        if needs_processing.any():
+            self.df.loc[needs_processing, 'country'] = (
+                self.df.loc[needs_processing, 'OSAC_Title']
+                .parallel_apply(lambda x: self.parse_country(x) or "")
+            )
+        
+        return self.df  # Returns complete DataFrame with all data

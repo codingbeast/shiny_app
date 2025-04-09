@@ -5,6 +5,7 @@ from typing import Optional, List
 from dateutil.parser import parse
 from datetime import datetime, timedelta
 import spacy
+from pandarallel import pandarallel
 
 class OSACDateParser:
     def __init__(self):
@@ -117,31 +118,32 @@ class OSACDateParser:
 
 
 class OSACDateCSVProcessor(OSACDateParser):
-    """Adds CSV handling while keeping date parsing logic separate"""
-
-    def __init__(self, df : pd.DataFrame):
+    def __init__(self, df: pd.DataFrame):
         super().__init__()
-        # if not os.path.exists(csv_path):
-        #     raise FileNotFoundError(f"CSV file not found: {csv_path}")
-        self.df = df
+        pandarallel.initialize()
+        self.df = df.copy()
         self.df.columns = self.df.columns.str.strip()
-        # self.csv_output_path = csv_output_path
-
-    def process_csv(self) -> pd.DataFrame:
-        """Processes the loaded CSV and adds date column"""
-        self.df['date'] = self.df.apply(
-            lambda row: self.parse_date(row['OSAC_Title'], row['OSAC_Date']),
-            axis=1
-        )
-        return self.df
     
     @property
-    def extract(self) -> None:
-        df_with_dates = self.process_csv()
-        return df_with_dates
-        #df_with_dates.to_csv(self.csv_output_path)
+    def extract(self) -> pd.DataFrame:
+        if 'date' not in self.df.columns:
+            self.df['date'] = None
+            
+        needs_processing = self.df['date'].isna() | (self.df['date'] == '')
         
-if __name__ == "__main__":
+        if needs_processing.any():
+            # Parallel apply for processing
+            self.df.loc[needs_processing, 'date'] = (
+                self.df.loc[needs_processing]
+                .parallel_apply(
+                    lambda row: self.parse_date(row['OSAC_Title'], row['OSAC_Date']),
+                    axis=1
+                )
+            )
+        
+        return self.df
+        
+# if __name__ == "__main__":
     
-    df_with_dates = OSACDateCSVProcessor().extract
-    print(df_with_dates)
+#     df_with_dates = OSACDateCSVProcessor().extract
+#     print(df_with_dates)

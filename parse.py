@@ -19,7 +19,7 @@ class DataParser:
         return self.df
     
     def save_df(self, df : pd.DataFrame) -> None:
-        df = df[['OSAC_Title', "country"]]
+        #df = df[['OSAC_Title', "country"]]
         df.to_csv(self.csv_output_path,index=False, encoding='utf-8')
 
 if __name__ == "__main__":
