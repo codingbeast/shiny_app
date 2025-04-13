@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from date import OSACDateCSVProcessor
 from country import OSACCountryProcessor
+from protest import OSACProtestProcessor
 from scraper import DriveManager,EXTRACTED_DETAILS_CSV_FILE_NAME
 
 
@@ -29,10 +30,11 @@ class DataParser(DriveManager):
 if __name__ == "__main__":
     data_parser = DataParser("osac.csv","osac_test.csv")
     df = data_parser.get_df
-    df_with_date = OSACDateCSVProcessor(df).extract
-    df_with_country = OSACCountryProcessor(df_with_date).extract
-    data_parser.save_df(df_with_country)
-    data_parser.upload_to_drive(df_with_country)
+    #df_with_date = OSACDateCSVProcessor(df).extract
+    #df_with_country = OSACCountryProcessor(df_with_date).extract
+    df_with_protest = OSACProtestProcessor(df).extract
+    data_parser.save_df(df_with_protest)
+    data_parser.upload_to_drive(df_with_protest)
 
     
 
