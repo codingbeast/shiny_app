@@ -739,6 +739,7 @@ Content-Disposition: form-data; name="pageNumber"
             temp['OSAC_Events'] = ''
             temp['OSAC_Actions'] = ''
             temp['OSAC_Assistance'] = ""
+            temp['OSAC_Other'] = ""
             #self.osac_dataset.append(temp)
             self.append_dict_to_csv(file_path = "osac.csv", data=temp)
             return None
@@ -766,21 +767,24 @@ Content-Disposition: form-data; name="pageNumber"
             temp['OSAC_Events'] = ''
             temp['OSAC_Actions'] = ''
             temp['OSAC_Assistance'] = ""
+            temp['OSAC_Other'] = ""
             #self.osac_dataset.append(temp)
             self.append_dict_to_csv(file_path = "osac.csv", data=temp)
             return None
         
         temp['OSAC_URL'] = url
-        
+        sections_to_remove = []
         try:
             location = self.extract_section(content_data, location_keyword, keywords_)
             temp['OSAC_Location'] = location
+            sections_to_remove.append(f"{location_keyword}{location}")
         except Exception as e:
             logger.warning("location not found set empty string")
             temp['OSAC_Location'] =  ""
         try:
             events = self.extract_section(content_data, event_keyword, keywords_)
             temp['OSAC_Events'] = events
+            sections_to_remove.append(f"{event_keyword}{events}")
         except Exception as e:
             logger.warning("events not found set empty string .")
             temp['OSAC_Events']  = ""
@@ -788,15 +792,34 @@ Content-Disposition: form-data; name="pageNumber"
         try:
             actions_to_take = self.extract_section(content_data, action_to_take_keyword, keywords_)
             temp['OSAC_Actions'] = actions_to_take
+            sections_to_remove.append(f"{action_to_take_keyword}{actions_to_take}")
         except Exception as e:
             logger.warning("actions not found set empty string .")
             temp['OSAC_Actions']  = ""
         try:
             assistance = self.extract_section(content_data, assistance_keyword, keywords_)
             temp['OSAC_Assistance'] = assistance
+            sections_to_remove.append(f"{assistance_keyword}{assistance}")
         except Exception as e:
             logger.warning("assitance not found set empty string.")
             temp['OSAC_Assistance'] = ""
+        
+        # Create OSAC_Others by removing captured sections from full content
+        others_content = content_data
+        for section in sections_to_remove:
+            others_content = others_content.replace(section, "")
+        
+        # Clean up the remaining content
+        others_content = self.clean_text_2(others_content)
+        
+        # Remove the title if it appears in the content
+        if 'OSAC_Title' in temp:
+            others_content = others_content.replace(temp['OSAC_Title'], "")
+        
+        # Remove multiple newlines and trim
+        others_content = re.sub(r'\n+', '\n', others_content).strip()
+        
+        temp['OSAC_Other'] = others_content if others_content else ""
         #store to a dataset
         #self.osac_dataset.append(temp)
         self.append_dict_to_csv(file_path = EXTRACTED_DETAILS_CSV_FILE_NAME, data=temp)
