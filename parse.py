@@ -28,13 +28,13 @@ class DataParser(DriveManager):
         self.write_csv_to_drive(file_name=EXTRACTED_DETAILS_CSV_FILE_NAME, data_list=csv_data, append=False)
 
 if __name__ == "__main__":
-    data_parser = DataParser("osac.csv","osac_test.csv")
+    data_parser = DataParser("dd.csv","osac.csv")
     df = data_parser.get_df
     #df_with_date = OSACDateCSVProcessor(df).extract
     #df_with_country = OSACCountryProcessor(df_with_date).extract
     df_with_protest = OSACProtestProcessor(df).extract
     data_parser.save_df(df_with_protest)
-    data_parser.upload_to_drive(df_with_protest)
+    #data_parser.upload_to_drive(df_with_protest)
 
     
 
