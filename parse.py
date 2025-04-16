@@ -23,9 +23,11 @@ class DataParser(DriveManager):
     def save_df(self, df : pd.DataFrame) -> None:
         #df = df[['OSAC_Title', "country"]]
         df.to_csv(self.csv_output_path,index=False, encoding='utf-8')
-    def upload_to_drive(self, df : pd.DataFrame):
+    def upload_to_drive(self, df : pd.DataFrame, filename =None):
+        if filename == None:
+            filename = EXTRACTED_DETAILS_CSV_FILE_NAME
         csv_data = df.to_dict(orient="records")
-        self.write_csv_to_drive(file_name=EXTRACTED_DETAILS_CSV_FILE_NAME, data_list=csv_data, append=False)
+        self.write_csv_to_drive(file_name=filename, data_list=csv_data, append=False)
 
 if __name__ == "__main__":
     data_parser = DataParser("dd.csv","osac.csv")
