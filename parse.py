@@ -33,8 +33,8 @@ class DataParser(DriveManager):
 if __name__ == "__main__":
     data_parser = DataParser("osac.csv","osac_parsed.csv")
     df = data_parser.get_df
-    #df_with_date = OSACDateCSVProcessor(df).extract
-    #df_with_country = OSACCountryProcessor(df_with_date).extract
+    df_with_date = OSACDateCSVProcessor(df).extract
+    df_with_country = OSACCountryProcessor(df_with_date).extract
     df_with_protest = OSACProtestProcessor(df).extract
     df_with_suppression = OSACSuppressionProcessor(df_with_protest).extract
     data_parser.save_df(df_with_suppression)

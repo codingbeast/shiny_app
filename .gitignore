@@ -9,6 +9,7 @@ doc
 links.txt
 output/
 osac.csv
+OSAC_parsed.csv
 # Distribution / packaging
 .Python
 build/
