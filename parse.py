@@ -5,6 +5,7 @@ from date import OSACDateCSVProcessor
 from country import OSACCountryProcessor
 from protest import OSACProtestProcessor
 from suppression import OSACSuppressionProcessor
+from anticipation import OSACDateAnticipationProcessor
 from scraper import DriveManager,EXTRACTED_DETAILS_CSV_FILE_NAME
 
 
@@ -31,14 +32,15 @@ class DataParser(DriveManager):
         self.write_csv_to_drive(file_name=filename, data_list=csv_data, append=False)
 
 if __name__ == "__main__":
-    data_parser = DataParser("osac.csv","osac_parsed.csv")
+    data_parser = DataParser("osac.csv","OSAC_parsed.csv")
     df = data_parser.get_df
     df_with_date = OSACDateCSVProcessor(df).extract
     df_with_country = OSACCountryProcessor(df_with_date).extract
-    df_with_protest = OSACProtestProcessor(df).extract
+    df_with_protest = OSACProtestProcessor(df_with_country).extract
     df_with_suppression = OSACSuppressionProcessor(df_with_protest).extract
-    data_parser.save_df(df_with_suppression)
-    #data_parser.upload_to_drive(df_with_protest)
+    df_with_aniticipation = OSACDateAnticipationProcessor(df_with_suppression).extract
+    data_parser.save_df(df_with_aniticipation)
+    data_parser.upload_to_drive(df_with_aniticipation, filename="OSAC_parsed.csv")
 
     
 
