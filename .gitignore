@@ -10,6 +10,8 @@ links.txt
 output/
 osac.csv
 OSAC_parsed.csv
+OSAC_daily.csv
+OSAC_monthly.csv
 # Distribution / packaging
 .Python
 build/
