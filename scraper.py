@@ -148,17 +148,12 @@ class DriveManager:
         headers = data_list[0].keys()
 
         # Check if the file already exists
-        file_id = None
-        if append:
-            file_id = self._get_file_id(file_name, folder_id)
-
-            if file_id:
-                # Download the existing file
-                existing_csv = self._download_file(file_id)
-                existing_data = list(csv.DictReader(io.StringIO(existing_csv)))
-
-                # Append new data to existing data
-                data_list = existing_data + data_list
+        file_id = self._get_file_id(file_name, folder_id)
+        if append and file_id:
+            existing_csv = self._download_file(file_id)
+            existing_data = list(csv.DictReader(io.StringIO(existing_csv)))
+            # Append new data to existing data
+            data_list = existing_data + data_list
 
         # Write CSV to an in-memory file
         csv_buffer = io.StringIO()
