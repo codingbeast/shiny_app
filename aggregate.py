@@ -73,4 +73,6 @@ class OSACAggregateProcessor:
         # Drop rows where all values are NaN
         OSAC_daily.dropna(how='all', inplace=True)
         
+        OSAC_daily['date'] = OSAC_daily['date'].apply(self.safe_parse)
+        
         return OSAC_daily
