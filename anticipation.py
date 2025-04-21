@@ -1,6 +1,6 @@
 from datetime import datetime
 import pandas as pd
-from dateutil import parser as date_parser
+from dateutil.parser import parse
 
 class OSACDateAnticipationProcessor:
     def __init__(self, df: pd.DataFrame, columns_to_return=None):
@@ -14,7 +14,7 @@ class OSACDateAnticipationProcessor:
         if isinstance(x, datetime):
             return x
         try:
-            return date_parser.parse(x, fuzzy=True)
+            return parse(x, fuzzy=True)
         except Exception:
             return pd.NaT
 
