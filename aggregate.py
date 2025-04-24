@@ -3,12 +3,16 @@ from dateutil.parser import parse
 from datetime import datetime
 
 class OSACAggregateProcessor:
-    def __init__(self, parsed_file_name: str):
+    def __init__(self, parsed_file_name: str, iso_country_file: str):
         self.parsed_file_name = parsed_file_name
+        self.iso_country_file = iso_country_file
         try:
             self.df = pd.read_csv(self.parsed_file_name, encoding='utf-8')
-        except Exception:
-            raise FileNotFoundError(f"File not found: {self.parsed_file_name}")
+            # Load all ISO countries
+            with open(iso_country_file, 'r') as f:
+                self.all_countries = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            raise FileNotFoundError(f"File not found: {e}")
 
     def safe_parse(self, x):
         if isinstance(x, datetime):
@@ -18,12 +22,12 @@ class OSACAggregateProcessor:
         except Exception:
             return pd.NaT
 
-    def get_all_country_dates(self, countries, start_date, end_date):
-        # Create a full date range
+    def get_all_country_dates(self, start_date, end_date):
+        # Create a full date range using ALL ISO countries
         full_dates = pd.date_range(start=start_date, end=end_date, freq='D')
-        # Cartesian product between countries and full date range
+        # Cartesian product between all countries and full date range
         full_index = pd.MultiIndex.from_product(
-            [countries, full_dates],
+            [self.all_countries, full_dates],
             names=['country', 'date']
         )
         return pd.DataFrame(index=full_index).reset_index()
@@ -42,14 +46,17 @@ class OSACAggregateProcessor:
         # Group actual data
         grouped = df.groupby(['country', 'date'])[indicators].max().reset_index()
 
-        # Get full date range
-        start_date = pd.Timestamp('2004-01-01')
-        end_date = pd.Timestamp.today().normalize()
-        countries = grouped['country'].unique()
-        full_dates_df = self.get_all_country_dates(countries, start_date, end_date)
+        # Get full date range using ALL countries
+        start_date = df['date'].min()  # Use earliest date from data
+        end_date = df['date'].max()    # Use latest date from data
+        full_dates_df = self.get_all_country_dates(start_date, end_date)
 
         # Merge and fill missing with 0
-        full_daily = full_dates_df.merge(grouped, on=['country', 'date'], how='left')
+        full_daily = full_dates_df.merge(
+            grouped, 
+            on=['country', 'date'], 
+            how='left'
+        )
         full_daily[indicators] = full_daily[indicators].fillna(0).astype(int)
 
         return full_daily

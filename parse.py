@@ -45,7 +45,7 @@ if __name__ == "__main__":
     data_parser.save_df(df_with_aniticipation)
     data_parser.upload_to_drive(df_with_aniticipation, filename="OSAC_parsed.csv")
     
-    aggregate_parser = OSACAggregateProcessor("OSAC_parsed.csv") #input the parseed csv file
+    aggregate_parser = OSACAggregateProcessor("OSAC_parsed.csv", "ISO_country_names.txt") #input the parseed csv file
     df_with_daily_data = aggregate_parser.extract_daily_data
     df_with_monthly_data = aggregate_parser.extract_monthly_data
     data_parser.save_df(df_with_daily_data, "OSAC_daily.csv")
