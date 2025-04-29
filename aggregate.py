@@ -10,7 +10,7 @@ class OSACAggregateProcessor:
             self.df = pd.read_csv(self.parsed_file_name, encoding='utf-8')
             # Load all ISO countries
             with open(iso_country_file, 'r') as f:
-                self.all_countries = [line.strip() for line in f if line.strip()]
+                self.all_countries = [line.strip().lower() for line in f if line.strip()]
         except Exception as e:
             raise FileNotFoundError(f"File not found: {e}")
 
@@ -34,31 +34,50 @@ class OSACAggregateProcessor:
 
     @property
     def extract_daily_data(self) -> pd.DataFrame:
+        # Step 1: Load and clean alert data
         df = self.df[['country', 'date', 'protest', 'suppression', 'anticipated']].copy()
         df.replace('', pd.NA, inplace=True)
         df.dropna(subset=['country', 'date'], how='any', inplace=True)
-        df['date'] = df['date'].apply(self.safe_parse)
+        
+        # Convert dates and ensure consistent format
+        df['date'] = pd.to_datetime(df['date'].apply(self.safe_parse)).dt.normalize()
         df = df.dropna(subset=['date'])
-
+        
+        # Convert indicators to integers
         indicators = ['protest', 'suppression', 'anticipated']
         df[indicators] = df[indicators].fillna(0).astype(int)
 
-        # Group actual data
-        grouped = df.groupby(['country', 'date'])[indicators].max().reset_index()
-
-        # Get full date range using ALL countries
-        start_date = df['date'].min()  # Use earliest date from data
-        end_date = df['date'].max()    # Use latest date from data
+        # Step 2: Create complete date range
+        start_date = df['date'].min()
+        end_date = df['date'].max()
         full_dates_df = self.get_all_country_dates(start_date, end_date)
+        full_dates_df['date'] = pd.to_datetime(full_dates_df['date']).dt.normalize()
 
-        # Merge and fill missing with 0
-        full_daily = full_dates_df.merge(
-            grouped, 
-            on=['country', 'date'], 
-            how='left'
+        # Step 3: Standardize country names before merge
+        # Create a mapping from alert country names to ISO codes if needed
+        # (This assumes you have a way to map them - may need additional logic)
+        country_map = {c: c for c in df['country'].unique()}  # Default 1:1 mapping
+        
+        grouped = (
+            df.assign(country_iso=df['country'].map(country_map))
+            .groupby(['country_iso', 'date'])[indicators]
+            .max()
+            .reset_index()
         )
-        full_daily[indicators] = full_daily[indicators].fillna(0).astype(int)
 
+        # Step 4: Perform merge with proper columns
+        full_daily = (
+            full_dates_df
+            .merge(grouped, 
+                  left_on=['country', 'date'],
+                  right_on=['country_iso', 'date'],
+                  how='left')
+            .drop(columns=['country_iso'])
+        )
+        
+        # Fill missing values
+        full_daily[indicators] = full_daily[indicators].fillna(0).astype(int)
+        
         return full_daily
 
     @property
