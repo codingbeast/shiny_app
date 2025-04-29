@@ -26,8 +26,9 @@ class OSACCountryParser:
         
         for line in self.iso_country:
             # Split variants and clean them
-            variants = [v.strip().lower() for v in re.split(r",|\|", line)]
-            primary = variants[0]
+            variants_raw = [v.strip() for v in re.split(r",|\|", line)]
+            primary = variants_raw[0]  # preserve original casing
+            variants = [v.lower() for v in variants_raw]
             
             # Add all variants to index
             for variant in variants:

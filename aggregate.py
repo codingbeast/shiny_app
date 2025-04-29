@@ -10,7 +10,7 @@ class OSACAggregateProcessor:
             self.df = pd.read_csv(self.parsed_file_name, encoding='utf-8')
             # Load all ISO countries
             with open(iso_country_file, 'r') as f:
-                self.all_countries = [line.strip().lower() for line in f if line.strip()]
+                self.all_countries = [line.strip() for line in f if line.strip()]
         except Exception as e:
             raise FileNotFoundError(f"File not found: {e}")
 
@@ -48,7 +48,8 @@ class OSACAggregateProcessor:
         df[indicators] = df[indicators].fillna(0).astype(int)
 
         # Step 2: Create complete date range
-        start_date = df['date'].min()
+        #start_date = df['date'].min()
+        start_date = pd.to_datetime("2004-01-01")
         end_date = df['date'].max()
         full_dates_df = self.get_all_country_dates(start_date, end_date)
         full_dates_df['date'] = pd.to_datetime(full_dates_df['date']).dt.normalize()
