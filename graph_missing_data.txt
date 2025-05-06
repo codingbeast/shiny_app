@@ -1,0 +1,31 @@
+provided graph bar data
+| Protest | Anticipated | Suppression | Visualization             |
+| ------- | ----------- | ----------- | ------------------------- |
+| 0       | 0           | 0           | ❌ No bar                  |
+| 1       | 0           | 0           | ⚪ Gray circle-based bar   |
+| 1       | 0           | 1           | 🟢 Green circle-based bar |
+| 1       | 1           | 0           | ⬛ Solid gray bar          |
+| 1       | 1           | 1           | 🟩 Solid green bar        |
+
+
+missing data 
+
+| Protest | Anticipated | Suppression | Inferred Visualization    | Reasoning                                                                        |
+| ------- | ----------- | ----------- | ------------------------- | -------------------------------------------------------------------------------- |
+| 0       | 0           | 1           | ⚪ Gray circle-based bar   | Suppression alone shown as gray circles in other protest=0 cases                 |
+| 0       | 1           | 0           | ⚪ Gray circle-based bar   | Anticipation alone behaves like suppression: use gray circles                    |
+| 0       | 1           | 1           | 🟢 Green circle-based bar | Same as (1,0,1): green circle bar → inference based on suppression + anticipated |
+
+
+final list graph bar 
+
+| Protest | Anticipated | Suppression | Visualization             | Notes                                                 |
+| ------- | ----------- | ----------- | ------------------------- | ----------------------------------------------------- |
+| 0       | 0           | 0           | ❌ No bar                  | Nothing happened                                      |
+| 0       | 0           | 1           | ⚪ Gray circle-based bar   | Suppression alone → gray circles                      |
+| 0       | 1           | 0           | ⚪ Gray circle-based bar   | Anticipated alone → gray circles                      |
+| 0       | 1           | 1           | 🟢 Green circle-based bar | Suppression + anticipated → green circles             |
+| 1       | 0           | 0           | ⚪ Gray circle-based bar   | Protest alone → gray circles                          |
+| 1       | 0           | 1           | 🟢 Green circle-based bar | Protest + suppression → green circles                 |
+| 1       | 1           | 0           | ⬛ Solid gray bar          | Protest + anticipated → solid gray bar                |
+| 1       | 1           | 1           | 🟩 Solid green bar        | Protest + anticipated + suppression → solid green bar |
