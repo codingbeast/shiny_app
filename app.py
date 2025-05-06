@@ -14,11 +14,82 @@ from PySide6.QtCore import (
 )
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+from matplotlib.collections import PatchCollection
 
 # Constants
 COUNTRY_PATH = "ISO_country_names.txt"
 OSAC_DAILY_PATH = "OSAC_daily.csv"
 OSAC_MONTHLY_PATH = "OSAC_monthly.csv"
+
+
+class DataParser:
+    
+    @staticmethod
+    def monthly_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()  # Ensure it's a deep copy, not a view
+        current_date = pd.to_datetime('today')
+        df.rename(columns={'month': 'date'}, inplace=True)
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m', errors='coerce')
+        df['formatted_date'] = df['date'].dt.strftime('%b\n%Y')
+        filtered_df = df[(df['date'] >= current_date - pd.DateOffset(months=20))]
+        filtered_df = filtered_df.sort_values(by='date', ascending=True)
+        filtered_df = filtered_df.reset_index(drop=True)
+        return filtered_df
+    @staticmethod
+    def fast_plot_monthly(df, ax,  n_circles=11):
+        circle_radius = 0.15
+        circle_gap = 0.4
+        bar_width = 0.6
+
+        patches = []
+        colors = []
+
+        bar_height = n_circles * (2 * circle_radius + circle_gap)
+
+        for idx, row in enumerate(df[['protest', 'anticipated', 'suppression']].values):
+            p, a, s = row
+
+            if (p, a, s) == (1, 1, 1):
+                color = 'green'
+                solid = True
+            elif (p, a, s) == (1, 1, 0):
+                color = 'gray'
+                solid = True
+            elif (p, a, s) in [(1, 0, 1), (0, 1, 1)]:
+                color = 'green'
+                solid = False
+            elif (p, a, s) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
+                color = 'gray'
+                solid = False
+            else:
+                continue  # (0,0,0)
+
+            if solid:
+                ax.bar(idx, bar_height, color=color, width=bar_width)
+            else:
+                for i in range(n_circles):
+                    y = i * (2 * circle_radius + circle_gap) + circle_radius
+                    patches.append(Circle((idx, y), circle_radius))
+                    colors.append(color)
+
+        if patches:
+            collection = PatchCollection(patches, facecolor=colors, edgecolor=colors)
+            ax.add_collection(collection)
+
+        # Formatting
+        ax.set_xlim(-0.5, len(df) - 0.5)
+        ax.set_xticks(range(len(df)))
+        ax.set_xticklabels(df['formatted_date'])
+        ax.set_ylim(0, bar_height + 1)
+        ax.set_yticks([])
+        # Set equal aspect ratio and manually adjust limits
+        ax.set_aspect('equal', adjustable='box')
+
+
+
+
 
 class DataManager:
     """Centralized data loading and management"""
@@ -37,7 +108,7 @@ class DataManager:
             self.daily_data = pd.DataFrame()
             self.monthly_data = pd.DataFrame()
     
-    def get_country_data(self, period, country):
+    def get_country_data(self, period, country) -> pd.DataFrame:
         """Get data for specific country and period"""
         data = self.daily_data if period == "daily" else self.monthly_data
         if 'country' in data.columns:
@@ -117,7 +188,7 @@ class BusySpinner(QLabel):
         """Set the spinner size"""
         self._size = size
         self.update()
-class GraphDisplay(QFrame):
+class GraphDisplay(QFrame, DataParser):
     def __init__(self, data_manager):
         super().__init__()
         self.data_manager = data_manager
@@ -128,7 +199,8 @@ class GraphDisplay(QFrame):
         # Main content
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Add this
+        self.canvas.updateGeometry()  # Add this
         # Create overlay widget for spinner
         self.overlay = QWidget(self)
         self.overlay.setStyleSheet("background-color: rgba(255, 255, 255, 200);")
@@ -174,15 +246,18 @@ class GraphDisplay(QFrame):
             
             # Get data from centralized DataManager
             country_data = self.data_manager.get_country_data(period, country)
-            
-            if not country_data.empty:
-                ax.plot(country_data['date'], country_data['value'], 'b-', label=country)
-                ax.set_title(f"{country} ({period.capitalize()} Data)")
-                ax.legend()
-                ax.grid(True)
+            parsed_df = DataParser.monthly_df_parsed(country_data)
+            if period=="monthly":
+                DataParser.fast_plot_monthly(df=parsed_df, ax = ax)
             else:
-                ax.text(0.5, 0.5, f"No data for {country}", 
-                       ha='center', va='center')
+                if not country_data.empty:
+                    ax.plot(country_data['date'], country_data['value'], 'b-', label=country)
+                    ax.set_title(f"{country} ({period.capitalize()} Data)")
+                    ax.legend()
+                    ax.grid(True)
+                else:
+                    ax.text(0.5, 0.5, f"No data for {country}", 
+                        ha='center', va='center')
             
             self.canvas.draw()
         except Exception as e:
