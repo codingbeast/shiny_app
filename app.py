@@ -17,6 +17,10 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
+from datetime import datetime
+import numpy as np
+from matplotlib.colors import ListedColormap
+
 
 # Constants
 COUNTRY_PATH = "ISO_country_names.txt"
@@ -25,7 +29,18 @@ OSAC_MONTHLY_PATH = "OSAC_monthly.csv"
 
 
 class DataParser:
-    
+
+    @staticmethod
+    def calculate_preventiveness(row):
+        if row['protest'] == 1 and row['anticipated'] == 0:
+            return 1
+        elif row['protest'] == 0 and row['anticipated'] == 0:
+            return 1
+        elif row['protest'] == 1 and row['anticipated'] == 1:
+            return 0
+        elif row['protest'] == 0 and row['anticipated'] == 1:
+            return 0
+        return 0  # Default case
     @staticmethod
     def monthly_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()  # Ensure it's a deep copy, not a view
@@ -37,6 +52,21 @@ class DataParser:
         filtered_df = filtered_df.sort_values(by='date', ascending=True)
         filtered_df = filtered_df.reset_index(drop=True)
         return filtered_df
+    
+    @staticmethod
+    def monthly_df_preventiveness(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()  # Ensure it's a deep copy, not a view
+        df['Index of Preventiveness'] =  df.apply(DataParser.calculate_preventiveness, axis=1)
+        df.rename(columns={
+            'protest': 'Any Protest',
+            'suppression': 'Any Suppressed Protest',
+            'anticipated' : 'Any Anticipated Protest',
+        }, inplace=True)
+        return df
+    @staticmethod
+    def get_monthy_df_preventiveness() -> list:
+        return ['Any Protest', 'Any Anticipated Protest', 'Any Suppressed Protest','Index of Preventiveness']
+    
     @staticmethod
     def daily_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()  # Ensure it's a deep copy, not a view
