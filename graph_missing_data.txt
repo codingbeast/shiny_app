@@ -29,3 +29,42 @@ final list graph bar
 | 1       | 0           | 1           | 🟢 Green circle-based bar | Protest + suppression → green circles                 |
 | 1       | 1           | 0           | ⬛ Solid gray bar          | Protest + anticipated → solid gray bar                |
 | 1       | 1           | 1           | 🟩 Solid green bar        | Protest + anticipated + suppression → solid green bar |
+
+
+
+
+==========================================   data value missing ==========================================
+
+provided 
+| protest | anticipated | suppression | preventiveness |
+| ------- | ----------- | ----------- | -------------- |
+| 1       | 1           | 0           | 0              |
+| 1       | 0           | 1           | 1              |
+| 0       | 0           | 0           | 1              |
+| 1       | 0           | 0           | 1              |
+| 1       | 1           | 0           | 0              |
+
+
+missing list
+| protest | anticipated | suppression | preventiveness |
+| ------- | ----------- | ----------- | -------------- |
+| 0       | 0           | 1           | 1              |
+| 0       | 1           | 0           | 0              |
+| 0       | 1           | 1           | 1              |
+| 1       | 1           | 1           | 0              |
+
+
+final list
+
+| protest | anticipated | suppression | preventiveness |
+| ------- | ----------- | ----------- | -------------- |
+| 1       | 1           | 0           | 0              |
+| 1       | 0           | 1           | 1              |
+| 0       | 0           | 0           | 1              |
+| 1       | 0           | 0           | 1              |
+| 1       | 1           | 0           | 0              |
+| 0       | 0           | 1           | 1              |
+| 0       | 1           | 0           | 0              |
+| 0       | 1           | 1           | 1              |
+| 1       | 1           | 1           | 0              |
+
