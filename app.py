@@ -33,10 +33,40 @@ class DataParser:
         df.rename(columns={'month': 'date'}, inplace=True)
         df['date'] = pd.to_datetime(df['date'], format='%Y-%m', errors='coerce')
         df['formatted_date'] = df['date'].dt.strftime('%b\n%Y')
-        filtered_df = df[(df['date'] >= current_date - pd.DateOffset(months=20))]
+        filtered_df = df[(df['date'] >= current_date - pd.DateOffset(months=12))]
         filtered_df = filtered_df.sort_values(by='date', ascending=True)
         filtered_df = filtered_df.reset_index(drop=True)
         return filtered_df
+    @staticmethod
+    def daily_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()  # Ensure it's a deep copy, not a view
+        df.rename(columns={'month': 'date'}, inplace=True)
+        current_date = pd.to_datetime('today')
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d', errors='coerce')
+        df['formatted_date'] = df['date'].dt.strftime('%b %d\n%Y')
+        filtered_df = df.sort_values(by='date', ascending=True)
+        filtered_df = filtered_df[
+            (filtered_df['date'] >= current_date - pd.DateOffset(days=31)) &
+            (filtered_df['date'] <= current_date)
+        ]
+        filtered_df = filtered_df.reset_index(drop=True)
+        filtered_df['group'] = filtered_df.index // 2
+        grouped_df = (
+            filtered_df
+            .groupby('group')
+            .agg({
+                'country': 'first',
+                'date': 'last',  # Take second date in the pair
+                'protest': 'max',
+                'suppression': 'max',
+                'anticipated': 'max',
+            })
+            .reset_index(drop=True)
+        )
+
+        # Add formatted_date again
+        grouped_df['formatted_date'] = grouped_df['date'].dt.strftime('%b %d\n%Y')
+        return grouped_df
     @staticmethod
     def fast_plot_monthly(df, ax,  n_circles=11):
         circle_radius = 0.15
@@ -81,16 +111,15 @@ class DataParser:
         # Formatting
         ax.set_xlim(-0.5, len(df) - 0.5)
         ax.set_xticks(range(len(df)))
-        ax.set_xticklabels(df['formatted_date'])
+        ax.set_xticklabels(df['formatted_date'],fontsize=5)
         ax.set_ylim(0, bar_height + 1)
         ax.set_yticks([])
         # Set equal aspect ratio and manually adjust limits
         ax.set_aspect('equal', adjustable='box')
-
-
-
-
-
+        # Remove the graph border
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+            
 class DataManager:
     """Centralized data loading and management"""
     def __init__(self):
@@ -188,6 +217,7 @@ class BusySpinner(QLabel):
         """Set the spinner size"""
         self._size = size
         self.update()
+
 class GraphDisplay(QFrame, DataParser):
     def __init__(self, data_manager):
         super().__init__()
@@ -242,23 +272,24 @@ class GraphDisplay(QFrame, DataParser):
         
         try:
             self.figure.clear()
+            plt.close('all')  # Close any lingering figures
             ax = self.figure.add_subplot(111)
             
             # Get data from centralized DataManager
             country_data = self.data_manager.get_country_data(period, country)
-            parsed_df = DataParser.monthly_df_parsed(country_data)
-            if period=="monthly":
-                DataParser.fast_plot_monthly(df=parsed_df, ax = ax)
+            if not country_data.empty:
+                if period=="monthly":
+                    parsed_df = DataParser.monthly_df_parsed(country_data)
+                    DataParser.fast_plot_monthly(df=parsed_df, ax = ax)
+                    #ax.set_title(f"Monthly Data for {country}", fontsize=10)
+                elif period == "daily":
+                    parsed_df = DataParser.daily_df_parsed(country_data)
+                    DataParser.fast_plot_monthly(df=parsed_df, ax = ax)
+                    #ax.set_title(f"Daily Data for {country}", fontsize=10)
             else:
-                if not country_data.empty:
-                    ax.plot(country_data['date'], country_data['value'], 'b-', label=country)
-                    ax.set_title(f"{country} ({period.capitalize()} Data)")
-                    ax.legend()
-                    ax.grid(True)
-                else:
-                    ax.text(0.5, 0.5, f"No data for {country}", 
-                        ha='center', va='center')
-            
+                ax.text(0.5, 0.5, f"No data for {country}", ha='center', va='center')
+                
+            self.figure.tight_layout()
             self.canvas.draw()
         except Exception as e:
             ax.text(0.5, 0.5, f"Error loading data:\n{str(e)}", 
@@ -368,7 +399,7 @@ class MainWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
 
 class PeriodSelector(QGroupBox):
-    periodChanged = Signal(str)  # 'daily' or 'monthly'
+    periodChanged = Signal(str)
     
     def __init__(self):
         super().__init__("Period")
@@ -389,12 +420,13 @@ class PeriodSelector(QGroupBox):
         layout.addWidget(self.monthly_rb)
         self.setLayout(layout)
         
-        self.daily_rb.toggled.connect(self.on_period_changed)
+        # Connect clicked signals instead of toggled
+        self.daily_rb.clicked.connect(lambda: self.emit_period("daily"))
+        self.monthly_rb.clicked.connect(lambda: self.emit_period("monthly"))
         
-    def on_period_changed(self, checked):
-        if checked:
-            period = "daily" if self.daily_rb.isChecked() else "monthly"
-            self.periodChanged.emit(period)
+    def emit_period(self, period):
+        """Force emit the period regardless of previous state"""
+        self.periodChanged.emit(period)
 
 class CountrySelector(QGroupBox):
     countryChanged = Signal(str)
