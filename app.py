@@ -32,15 +32,30 @@ class DataParser:
 
     @staticmethod
     def calculate_preventiveness(row):
-        if row['protest'] == 1 and row['anticipated'] == 0:
-            return 1
-        elif row['protest'] == 0 and row['anticipated'] == 0:
-            return 1
-        elif row['protest'] == 1 and row['anticipated'] == 1:
+        protest = row['protest']
+        anticipated = row['anticipated']
+        suppression = row['suppression']
+
+        # Match exactly against the known patterns
+        if protest == 1 and anticipated == 1 and suppression == 0:
             return 0
-        elif row['protest'] == 0 and row['anticipated'] == 1:
+        elif protest == 1 and anticipated == 0 and suppression == 1:
+            return 1
+        elif protest == 0 and anticipated == 0 and suppression == 0:
+            return 1
+        elif protest == 1 and anticipated == 0 and suppression == 0:
+            return 1
+        elif protest == 0 and anticipated == 0 and suppression == 1:
+            return 1
+        elif protest == 0 and anticipated == 1 and suppression == 0:
             return 0
-        return 0  # Default case
+        elif protest == 0 and anticipated == 1 and suppression == 1:
+            return 1
+        elif protest == 1 and anticipated == 1 and suppression == 1:
+            return 0
+        else:
+            return 0  # Default case (for safety)
+
     @staticmethod
     def monthly_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()  # Ensure it's a deep copy, not a view
@@ -52,19 +67,38 @@ class DataParser:
         filtered_df = filtered_df.sort_values(by='date', ascending=True)
         filtered_df = filtered_df.reset_index(drop=True)
         return filtered_df
-    
     @staticmethod
     def monthly_df_preventiveness(df: pd.DataFrame) -> pd.DataFrame:
-        df = df.copy()  # Ensure it's a deep copy, not a view
-        df['Index of Preventiveness'] =  df.apply(DataParser.calculate_preventiveness, axis=1)
-        df.rename(columns={
-            'protest': 'Any Protest',
-            'suppression': 'Any Suppressed Protest',
-            'anticipated' : 'Any Anticipated Protest',
-        }, inplace=True)
+        # Clean column names first
+        df = DataParser.monthly_df_parsed(df)
+        df.columns = df.columns.str.strip().str.lower()
+        
+        # Verify required columns exist
+        required = {'protest', 'anticipated', 'suppression'}
+        missing = required - set(df.columns)
+        if missing:
+            available = list(df.columns)
+            raise ValueError(
+                f"Missing columns {missing}. Available columns: {available}"
+            )
+        
+        # Calculate preventiveness
+        df['index of preventiveness'] = df.apply(
+            DataParser.calculate_preventiveness, 
+            axis=1
+        )
+        
+        # Rename columns (optional)
+        # df = df.rename(columns={
+        #     'protest': 'Any Protest',
+        #     'suppression': 'Any Suppressed Protest',
+        #     'anticipated': 'Any Anticipated Protest',
+        # })
+        
         return df
+
     @staticmethod
-    def get_monthy_df_preventiveness() -> list:
+    def get_monthy_df_preventiveness_titles() -> list:
         return ['Any Protest', 'Any Anticipated Protest', 'Any Suppressed Protest','Index of Preventiveness']
     
     @staticmethod
@@ -97,6 +131,57 @@ class DataParser:
         # Add formatted_date again
         grouped_df['formatted_date'] = grouped_df['date'].dt.strftime('%b %d\n%Y')
         return grouped_df
+
+    @staticmethod
+    def fast_plot_preventiveness(df, ax):
+        # Prepare dataframe
+        df = df.copy()
+        df['Index of Preventiveness'] = df.apply(DataParser.calculate_preventiveness, axis=1)
+        df.rename(columns={
+            'protest': 'Any Protest',
+            'suppression': 'Any Suppressed Protest',
+            'anticipated': 'Any Anticipated Protest',
+        }, inplace=True)
+        
+        # Extract event data and transpose for imshow
+        events = DataParser.get_monthy_df_preventiveness_titles()
+        data_matrix = df[events].values.T  # Shape: (4 events × n months)
+
+        # Custom colormap: white background only
+        cmap = ListedColormap(['white'])
+
+        # Display data (no gradient)
+        im = ax.imshow(
+            data_matrix, 
+            cmap=cmap,
+            aspect='auto',
+            vmin=0,
+            vmax=1
+        )
+
+        # Add text annotations
+        for i in range(data_matrix.shape[0]):      # Rows (events)
+            for j in range(data_matrix.shape[1]):  # Columns (months)
+                ax.text(
+                    j, i,
+                    str(data_matrix[i, j]),
+                    ha='center',
+                    va='center',
+                    color='black',
+                    fontsize=10
+                )
+
+        # Customize axes
+        ax.set_xticks([])
+        ax.set_xticklabels([])  # No x-axis labels
+        ax.set_yticks(np.arange(len(events)))
+        ax.set_yticklabels(events,fontsize=5)
+        ax.grid(False)
+        # # Automatically adjust layout
+        # plt.tight_layout()
+        # Remove the graph border
+        # for spine in ax.spines.values():
+        #     spine.set_visible(False)
     @staticmethod
     def fast_plot_monthly(df, ax,  n_circles=11):
         circle_radius = 0.15
@@ -147,8 +232,8 @@ class DataParser:
         # Set equal aspect ratio and manually adjust limits
         ax.set_aspect('equal', adjustable='box')
         # Remove the graph border
-        for spine in ax.spines.values():
-            spine.set_visible(False)
+        # for spine in ax.spines.values():
+        #     spine.set_visible(False)
             
 class DataManager:
     """Centralized data loading and management"""
@@ -252,7 +337,8 @@ class GraphDisplay(QFrame, DataParser):
     def __init__(self, data_manager):
         super().__init__()
         self.data_manager = data_manager
-        self.setFrameShape(QFrame.Box)
+        #self.setFrameShape(QFrame.Box)
+        self.setFrameShape(QFrame.NoFrame)
         self.setStyleSheet("background-color: white;")
         self.setMinimumSize(500, 400)
         
@@ -374,7 +460,7 @@ class MainWindow(QMainWindow):
         self.country_selector = CountrySelector(default_country=self.current_country)
         self.graph_display = GraphDisplay(self.data_manager)
         self.side_panel = SidePanel()
-        self.bottom_panel = BottomPanel()
+        self.bottom_panel = BottomPanel(self.data_manager)
 
         # Add to grid
         grid.addWidget(self.period_selector, 0, 1)
@@ -416,6 +502,9 @@ class MainWindow(QMainWindow):
             QApplication.setOverrideCursor(Qt.WaitCursor)
             QApplication.processEvents()
             
+            # Show/hide bottom panel based on period
+            self.bottom_panel.setVisible(self.current_period == "monthly")
+            
             # Get data once and pass to all widgets
             country_data = self.data_manager.get_country_data(
                 self.current_period, 
@@ -424,10 +513,32 @@ class MainWindow(QMainWindow):
             
             self.graph_display.update_data(self.current_period, self.current_country)
             self.side_panel.update_data(self.current_period, self.current_country)
-            self.bottom_panel.update_data(self.current_period, self.current_country)
+            
+            # Only update bottom panel if visible
+            if self.current_period == "monthly":
+                self.bottom_panel.update_data(self.current_period, self.current_country)
+                
+            # Adjust grid row stretch factors
+            self.adjust_layout_for_period()
+            
         finally:
             QApplication.restoreOverrideCursor()
-
+    def adjust_layout_for_period(self):
+        """Adjust layout stretch factors based on period"""
+        layout = self.centralWidget().layout()
+        
+        if self.current_period == "monthly":
+            # Show bottom panel - give more space to main content
+            layout.setRowStretch(0, 1)  # Top controls
+            layout.setRowStretch(1, 3)  # Graph row 1
+            layout.setRowStretch(2, 3)  # Graph row 2
+            layout.setRowStretch(3, 1)  # Bottom panel
+        else:
+            # Hide bottom panel - expand main content
+            layout.setRowStretch(0, 1)  # Top controls
+            layout.setRowStretch(1, 4)  # Graph row 1
+            layout.setRowStretch(2, 4)  # Graph row 2
+            layout.setRowStretch(3, 0)  # Bottom panel (hidden)
 class PeriodSelector(QGroupBox):
     periodChanged = Signal(str)
     
@@ -502,22 +613,91 @@ class SidePanel(QFrame):
     def update_data(self, period, country):
         self.label.setText(f"Country: {country}\nPeriod: {period.capitalize()}")
 
+
 class BottomPanel(QFrame):
-    def __init__(self):
+    def __init__(self, data_manager=None):
         super().__init__()
-        self.setFrameShape(QFrame.Box)
-        self.setStyleSheet("background-color: #e0e0e0;")
-        self.setMinimumHeight(150)
+        self.data_manager = data_manager
+        self.setup_ui()
+        self.setup_overlay()
         
-        self.label = QLabel("Summary Statistics")
-        self.label.setAlignment(Qt.AlignCenter)
+    def setup_ui(self):
+        """Initialize the main UI components"""
+        #self.setFrameShape(QFrame.Box)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setStyleSheet("background-color: white;")
+        self.setMinimumSize(800, 100)
         
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        self.setLayout(layout)
+        # Matplotlib figure and canvas
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.canvas)
+        
+    def setup_overlay(self):
+        """Initialize loading overlay components"""
+        self.overlay = QWidget(self)
+        self.overlay.setStyleSheet("background-color: rgba(255, 255, 255, 200);")
+        self.overlay.hide()
+        
+        self.spinner = BusySpinner(self.overlay)
+        self.spinner.setColor(QColor(70, 130, 180))
+        
+        overlay_layout = QVBoxLayout(self.overlay)
+        overlay_layout.addWidget(self.spinner, 0, Qt.AlignCenter)
+        
+    def show_loading(self, show=True):
+        """Toggle loading spinner visibility"""
+        if show:
+            self.overlay.resize(self.size())
+            self.overlay.raise_()
+            self.overlay.show()
+            self.spinner.start()
+        else:
+            self.spinner.stop()
+            self.overlay.hide()
+        QApplication.processEvents()
+        
+    def resizeEvent(self, event):
+        """Handle window resize events"""
+        super().resizeEvent(event)
+        self.overlay.resize(self.size())
         
     def update_data(self, period, country):
-        self.label.setText(f"Showing {period} data for {country}")
+        """Update the graph with new data"""
+        self.show_loading(True)
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        if self.data_manager:
+            country_data = self.data_manager.get_country_data(period, country)
+            
+            if not country_data.empty:
+                # Process and plot the data
+                df = DataParser.monthly_df_preventiveness(country_data)
+                DataParser.fast_plot_preventiveness(df, ax)
+            else:
+                ax.text(0.5, 0.5, f"No data available for {country}", 
+                        ha='center', va='center')
+        else:
+            ax.text(0.5, 0.5, "Data manager not initialized", 
+                    ha='center', va='center')
+        try:
+            pass
+                
+            self.figure.tight_layout()
+            self.canvas.draw()
+            
+        except Exception as e:
+            ax.text(0.5, 0.5, f"Error loading data:\n{str(e)}", 
+                   ha='center', va='center')
+            self.canvas.draw()
+            
+        finally:
+            self.show_loading(False)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
