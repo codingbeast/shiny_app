@@ -292,7 +292,7 @@ class DataParser:
             ha='center', va='center', fontsize=8)
     @staticmethod
     def example_genrater(fig):
-        # Sample data
+        # Sample data - same as before
         data = [
             (0, 0, 1),
             (1, 0, 1),
@@ -303,34 +303,35 @@ class DataParser:
             "None Anticipated,\nNone Suppressed",
             "None Anticipated,\nNone Suppressed",
             "Any Anticipated,\nNone Suppressed",
-            "Any Anticipated,\nAnySuppressed",
+            "Any Anticipated,\nAny Suppressed",
         ]
 
-        df = pd.DataFrame(data, columns=["protest", "anticipated", "suppression"])
-        df["formatted_date"] = titles
+        # Create GridSpec with more compact layout
+        gs = gridspec.GridSpec(len(data)*2 + 1, 1, 
+                            height_ratios=[0.3] + [0.8, 0.3]*len(data),
+                            hspace=0.1)  # Reduced spacing
 
-        # Create GridSpec with header row
-        gs = gridspec.GridSpec(len(df)*2 + 1, 1,  # Added +1 for header row
-                            height_ratios=[0.3] + [1, 0.3]*len(df),  # First 0.3 for header
-                            hspace=0.02)
-
-        # Add header
+        # Add header - smaller font
         header_ax = fig.add_subplot(gs[0])
         header_ax.axis('off')
-        header_ax.text(0.5, 0.5, "Protest Type (If Any)", 
+        header_ax.text(0.5, 0.5, "Protest Type", 
                     ha='center', va='center',
-                    fontsize=10,)
+                    fontsize=9)  # Smaller font
+        header_ax.plot([0.3, 0.7], [0.47, 0.47], color='black', linewidth=0.5)  # Thinner line
 
-        # Draw underline manually
-        header_ax.plot([0.3, 0.7], [0.47, 0.47], color='black', linewidth=1)
-        # Create the visualization (note we start from gs[1] now)
-        for i, row in enumerate(df.iterrows(), start=1):
-            bar_ax = fig.add_subplot(gs[i*2 - 1])  # Adjusted indices for header
-            title_ax = fig.add_subplot(gs[i*2])    # Adjusted indices for header
+        # Create the visualization
+        for i, (p, a, s) in enumerate(data, start=1):
+            bar_ax = fig.add_subplot(gs[i*2 - 1])
+            title_ax = fig.add_subplot(gs[i*2])
             
-            DataParser.draw_bar(bar_ax, row[1]['protest'], row[1]['anticipated'], row[1]['suppression'])
-            DataParser.add_title(title_ax, row[1]['formatted_date'])
-
+            # Draw smaller bars
+            DataParser.draw_bar(bar_ax, p, a, s)
+            
+            # Add title with smaller font
+            title_ax.axis('off')
+            title_ax.text(0.5, 0.5, titles[i-1], 
+                        ha='center', va='center', 
+                        fontsize=7)  # Smaller font
 
   
 class DataManager:
@@ -565,7 +566,7 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.period_selector, 0, 1)
         grid.addWidget(self.country_selector, 0, 2)
         grid.addWidget(self.graph_display, 1, 1, 2, 2)
-        grid.addWidget(self.side_panel, 1, 3, 2, 1)
+        grid.addWidget(self.side_panel, 1, 3, 2, 3)
         grid.addWidget(self.bottom_panel, 3, 0, 1, 3)
 
         # Set stretch factors
