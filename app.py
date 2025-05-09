@@ -6,6 +6,9 @@ from PySide6.QtWidgets import (
     QLabel, QRadioButton, QVBoxLayout, QButtonGroup, 
     QComboBox, QGroupBox, QFrame, QMessageBox, QSizePolicy
 )
+import matplotlib.gridspec as gridspec
+from matplotlib.patches import Circle
+from matplotlib.collections import PatchCollection
 from PySide6.QtGui import (
     QPalette, QPainter, QPen, QColor
 )
@@ -234,7 +237,103 @@ class DataParser:
         # Remove the graph border
         # for spine in ax.spines.values():
         #     spine.set_visible(False)
+    # Bar drawing functions (unchanged)
+    @staticmethod
+    def draw_solid_bar(ax, color, n_circles=5):
+        circle_radius = 0.09
+        circle_gap = 0.2
+        bar_height = 0.3
+        bar_length = n_circles * (2 * circle_radius + circle_gap)
+        total_width = bar_length + 1
+        start_x = (total_width - bar_length) / 2
+        
+        ax.barh([0], [bar_length], left=start_x, color=color, height=bar_height)
+        DataParser.setup_axes(ax, total_width)
+    @staticmethod
+    def draw_circle_bar(ax, color, n_circles=5):
+        circle_radius = 0.09
+        circle_gap = 0.2
+        bar_length = n_circles * (2 * circle_radius + circle_gap)
+        total_width = bar_length + 1
+        start_x = (total_width - bar_length) / 2
+        
+        patches = []
+        for i in range(n_circles):
+            x = start_x + i * (2 * circle_radius + circle_gap) + circle_radius
+            patches.append(Circle((x, 0), circle_radius))
+        
+        collection = PatchCollection(patches, facecolor=color, edgecolor=color)
+        ax.add_collection(collection)
+        DataParser.setup_axes(ax, total_width)
+    @staticmethod
+    def setup_axes(ax, total_width):
+        ax.set_xlim(0, total_width)
+        ax.set_ylim(-0.5, 0.5)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        ax.set_aspect('auto')
+    @staticmethod
+    def draw_bar(ax, p, a, s):
+        if (p, a, s) == (1, 1, 1):
+            DataParser.draw_solid_bar(ax, 'green')
+        elif (p, a, s) == (1, 1, 0):
+            DataParser.draw_solid_bar(ax, 'gray')
+        elif (p, a, s) in [(1, 0, 1), (0, 1, 1)]:
+            DataParser.draw_circle_bar(ax, 'green')
+        elif (p, a, s) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
+            DataParser.draw_circle_bar(ax, 'gray')
+    @staticmethod
+    def add_title(ax, text, bar_length=5*(2*0.15 + 0.3)):
+        ax.axis('off')
+        total_width = bar_length + 1
+        ax.set_xlim(0, total_width)
+        ax.text(total_width / 2, 0.2, text, 
+            ha='center', va='center', fontsize=8)
+    @staticmethod
+    def example_genrater(fig):
+        # Sample data
+        data = [
+            (0, 0, 1),
+            (1, 0, 1),
+            (1, 1, 0),
+
+            (1, 1, 1),
+        ]
+        titles = [
+            "None Anticipated,\nNone Suppressed",
+            "None Anticipated,\nNone Suppressed",
+            "Any Anticipated,\nNone Suppressed",
+            "Any Anticipated,\nAnySuppressed",
+        ]
+
+        df = pd.DataFrame(data, columns=["protest", "anticipated", "suppression"])
+        df["formatted_date"] = titles
+
+        # Create GridSpec with header row
+        gs = gridspec.GridSpec(len(df)*2 + 1, 1,  # Added +1 for header row
+                            height_ratios=[0.3] + [1, 0.3]*len(df),  # First 0.3 for header
+                            hspace=0.02)
+
+        # Add header
+        header_ax = fig.add_subplot(gs[0])
+        header_ax.axis('off')
+        header_ax.text(0.5, 0.5, "Protest Type (If Any)", 
+                    ha='center', va='center',
+                    fontsize=10,)
+
+        # Draw underline manually
+        header_ax.plot([0.3, 0.7], [0.47, 0.47], color='black', linewidth=1)
+        # Create the visualization (note we start from gs[1] now)
+        for i, row in enumerate(df.iterrows(), start=1):
+            bar_ax = fig.add_subplot(gs[i*2 - 1])  # Adjusted indices for header
+            title_ax = fig.add_subplot(gs[i*2])    # Adjusted indices for header
             
+            DataParser.draw_bar(bar_ax, row[1]['protest'], row[1]['anticipated'], row[1]['suppression'])
+            DataParser.add_title(title_ax, row[1]['formatted_date'])
+
+
+  
 class DataManager:
     """Centralized data loading and management"""
     def __init__(self):
@@ -345,6 +444,7 @@ class GraphDisplay(QFrame, DataParser):
         # Main content
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Add this
         self.canvas.updateGeometry()  # Add this
         # Create overlay widget for spinner
@@ -489,10 +589,12 @@ class MainWindow(QMainWindow):
         self.update_all_widgets()
         
     def on_period_changed(self, period):
+        print(f"period changed -> {period}") #todo : comment this after debug
         self.current_period = period
         self.update_all_widgets()
         
     def on_country_changed(self, country):
+        print(f"country changed -> {country}") #todo : comment this after debug
         self.current_country = country
         self.update_all_widgets()
         
@@ -596,23 +698,48 @@ class CountrySelector(QGroupBox):
         self.setLayout(layout)
         self.combo_box.currentTextChanged.connect(self.countryChanged.emit)
 
-class SidePanel(QFrame):
+class SidePanel(QFrame,DataParser):
     def __init__(self):
         super().__init__()
         self.setFrameShape(QFrame.Box)
-        self.setStyleSheet("background-color: #f0f0f0;")
-        self.setMinimumSize(200, 400)
+        self.setMinimumSize(200, 300)
         
-        self.label = QLabel("Additional Information")
-        self.label.setAlignment(Qt.AlignCenter)
+        # Create a flag to track if we've generated the graph
+        self.graph_generated = False
         
+        # Main layout
         layout = QVBoxLayout()
-        layout.addWidget(self.label)
+        
+        # Create a widget for the static graph
+        self.static_graph_widget = QWidget()
+        self.static_graph_layout = QVBoxLayout(self.static_graph_widget)
+        self.static_graph_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add to main layout
+        layout.addWidget(self.static_graph_widget)
         self.setLayout(layout)
         
     def update_data(self, period, country):
-        self.label.setText(f"Country: {country}\nPeriod: {period.capitalize()}")
-
+        # self.label.setText(f"Country: {country}\nPeriod: {period.capitalize()}")
+        
+        # Only generate the graph once
+        if not self.graph_generated:
+            self.generate_static_graph()
+            self.graph_generated = True
+    
+    def generate_static_graph(self):
+        """Generate a static graph that only shows once"""
+        # Clear any existing widgets
+        for i in reversed(range(self.static_graph_layout.count())): 
+            self.static_graph_layout.itemAt(i).widget().setParent(None)
+        
+        # Create a simple matplotlib figure
+        fig = Figure(figsize=(2, 4*0.1 + 0.3)) 
+        DataParser.example_genrater(fig=fig)
+        
+        # Create canvas and add to layout
+        canvas = FigureCanvas(fig)
+        self.static_graph_layout.addWidget(canvas)
 
 class BottomPanel(QFrame):
     def __init__(self, data_manager=None):
@@ -626,11 +753,12 @@ class BottomPanel(QFrame):
         #self.setFrameShape(QFrame.Box)
         self.setFrameShape(QFrame.NoFrame)
         self.setStyleSheet("background-color: white;")
-        self.setMinimumSize(800, 100)
+        self.setMinimumSize(750, 100)
         
         # Matplotlib figure and canvas
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         # Main layout
@@ -666,7 +794,18 @@ class BottomPanel(QFrame):
         """Handle window resize events"""
         super().resizeEvent(event)
         self.overlay.resize(self.size())
-        
+    def print_figure_size(self):
+        """Print the current figure dimensions"""
+        if hasattr(self, 'figure'):
+            # Get size in inches (Matplotlib's native figure units)
+            width_in, height_in = self.figure.get_size_inches()
+            print(f"GraphDisplay Figure Size: {width_in:.2f} x {height_in:.2f} inches")
+            
+            # Get actual pixel dimensions of the canvas
+            if hasattr(self, 'canvas'):
+                width_px = self.canvas.width()
+                height_px = self.canvas.height()
+                print(f"GraphDisplay Canvas Size: {width_px} x {height_px} pixels")
     def update_data(self, period, country):
         """Update the graph with new data"""
         self.show_loading(True)
@@ -698,7 +837,7 @@ class BottomPanel(QFrame):
             
         finally:
             self.show_loading(False)
-
+        #self.print_figure_size()
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
