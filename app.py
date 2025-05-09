@@ -297,7 +297,6 @@ class DataParser:
             (0, 0, 1),
             (1, 0, 1),
             (1, 1, 0),
-
             (1, 1, 1),
         ]
         titles = [
@@ -734,7 +733,7 @@ class SidePanel(QFrame,DataParser):
             self.static_graph_layout.itemAt(i).widget().setParent(None)
         
         # Create a simple matplotlib figure
-        fig = Figure(figsize=(2, 4*0.1 + 0.3)) 
+        fig = Figure(figsize=(1.5, 4*0.1 + 0.3)) 
         DataParser.example_genrater(fig=fig)
         
         # Create canvas and add to layout
