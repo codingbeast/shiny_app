@@ -16,7 +16,7 @@
       border-radius: 1px;
     }
     
-    /* Graph container - left (main plot) */
+    /* Main plot container (left) */
     .main-plot-container {
       padding: 0;
       display: flex;
@@ -25,7 +25,7 @@
       background-color: white;
     }
     
-    /* Graph container - right (example plot) */
+    /* Example plot container (right) */
     .example-plot-container {
       border: 2px solid #333;
       padding: 0;
@@ -35,16 +35,30 @@
       background-color: white;
     }
     
-    /* Image styles - ensures perfect visibility */
+    /* Bottom plot container */
+    .bottom-plot-container {
+      /* padding: 10px 0; Controlled 10px top/bottom padding */
+      background-color: white;
+    }
+    
+    /* Main image styling */
     .plot-image {
       width: 100%;
       height: 100%;
-      object-fit: scale-down; /* Ensures full visibility while fitting container */
+      object-fit: contain;
       display: block;
-      background-color: white; /* Match your image background */
     }
     
-    /* Form element styles */
+    /* Bottom image specific styling */
+    .bottom-plot-image {
+      width: 100%;
+      height: auto;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    
+    /* Form elements styling */
     .custom-box {
       display: flex;
       flex-direction: column;
@@ -103,7 +117,7 @@
       margin-right: 8px;
     }
     
-    /* Equal height row solution */
+    /* Row and column adjustments */
     .image-row {
       display: flex;
       flex-wrap: wrap;
@@ -115,11 +129,19 @@
       flex-direction: column;
     }
     
-    /* Height control */
     .plot-wrapper {
-      min-height: 400px; /* Set minimum height for visibility */
+      padding-bottom: 0; /* Default - no padding */ 
       flex-grow: 1;
     }
+    /* Responsive padding at md breakpoint and up */
+    @media (min-width: 768px) {
+      .plot-wrapper {
+        padding-bottom: 10px;
+      }
+    }
+    /* .bottom-image-row {
+      margin-top: 10px;
+    } */
   </style>
 </head>
 <body>
@@ -170,9 +192,9 @@
       </div>
     </div>
 
-    <!-- Image row - perfectly matched heights -->
+    <!-- Main image row -->
     <div class="row justify-content-center image-row">
-      <!-- Main Plot (no additional border) -->
+      <!-- Main Plot -->
       <div class="col-12 col-sm-12 col-md-12 col-lg-8 offset-lg-2 col-xl-6 offset-xl-2 col-xxl-6 offset-xxl-2">
         <div class="plot-wrapper">
           <div class="main-plot-container">
@@ -181,7 +203,7 @@
         </div>
       </div>
       
-      <!-- Example Plot (with border) -->
+      <!-- Example Plot -->
       <div class="col-12 col-sm-12 col-md-12 col-lg-2 col-xl-2 col-xxl-2">
         <div class="plot-wrapper">
           <div class="example-plot-container">
@@ -191,83 +213,76 @@
       </div>
     </div>
 
-    <!-- Bottom image (conditional) -->
+    <!-- Bottom image row -->
     {% if is_month %}
-    <div class="row justify-content-center">
+    <div class="row justify-content-center bottom-image-row">
       <div class="col-12 col-sm-12 col-md-12 col-lg-8 col-xl-6 col-xxl-6">
-        <div class="main-plot-container">
-          <img src="data:image/png;base64,{{img_data_buttom }}" class="plot-image">
+        <div class="bottom-plot-container">
+          <img src="data:image/png;base64,{{img_data_buttom }}" class="bottom-plot-image">
         </div>
       </div>
     </div>
     {% endif %}
-  </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // URL parameter handling
-      const urlParams = new URLSearchParams(window.location.search);
-      let period = urlParams.get('period') || 'monthly';
-      let country = urlParams.get('country') || '{{ selected_country_name }}';
-      
-      // Set initial values
-      document.querySelector(`input[value="${period}"]`).checked = true;
-      document.getElementById('countrySelect').value = country;
-      
-      // Event listeners
-      document.querySelectorAll('input[name="period"]').forEach(radio => {
-        radio.addEventListener('change', updateUrlAndReload);
-      });
-      
-      document.getElementById('countrySelect').addEventListener('change', updateUrlAndReload);
-      
-      // Perfect height synchronization
-      function syncHeights() {
-        const mainPlot = document.querySelector('.main-plot-container');
-        const examplePlot = document.querySelector('.example-plot-container');
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // URL parameter handling
+        const urlParams = new URLSearchParams(window.location.search);
+        let period = urlParams.get('period') || 'monthly';
+        let country = urlParams.get('country') || '{{ selected_country_name }}';
         
-        if (!mainPlot || !examplePlot) return;
+        // Set initial values
+        document.querySelector(`input[value="${period}"]`).checked = true;
+        document.getElementById('countrySelect').value = country;
         
-        // Reset heights to natural sizes
-        mainPlot.style.height = 'auto';
-        examplePlot.style.height = 'auto';
+        // Event listeners
+        document.querySelectorAll('input[name="period"]').forEach(radio => {
+          radio.addEventListener('change', updateUrlAndReload);
+        });
         
-        // Get the maximum height
-        const maxHeight = Math.max(
-          mainPlot.offsetHeight,
-          examplePlot.offsetHeight
-        );
+        document.getElementById('countrySelect').addEventListener('change', updateUrlAndReload);
         
-        // Apply the maximum height to both
-        if (maxHeight > 0) {
-          mainPlot.style.height = `${maxHeight}px`;
-          examplePlot.style.height = `${maxHeight}px`;
+        // Height synchronization
+        function syncHeights() {
+          const mainPlot = document.querySelector('.main-plot-container');
+          const examplePlot = document.querySelector('.example-plot-container');
+          
+          if (!mainPlot || !examplePlot) return;
+          
+          // Reset heights
+          mainPlot.style.height = 'auto';
+          examplePlot.style.height = 'auto';
+          
+          // Get natural heights
+          const mainHeight = mainPlot.offsetHeight;
+          const exampleHeight = examplePlot.offsetHeight;
+          
+          // Apply the maximum height
+          if (mainHeight > 0 && exampleHeight > 0) {
+            const maxHeight = Math.max(mainHeight, exampleHeight);
+            mainPlot.style.height = `${maxHeight}px`;
+            examplePlot.style.height = `${maxHeight}px`;
+          }
         }
-      }
-      
-      // Run synchronization
-      syncHeights();
-      
-      // Add resize observer for dynamic content
-      const resizeObserver = new ResizeObserver(syncHeights);
-      document.querySelectorAll('.plot-image').forEach(img => {
-        resizeObserver.observe(img);
+        
+        // Initial sync
+        syncHeights();
+        
+        // Sync on window resize
+        window.addEventListener('resize', syncHeights);
+        
+        function updateUrlAndReload() {
+          const newPeriod = document.querySelector('input[name="period"]:checked').value;
+          const newCountry = document.getElementById('countrySelect').value;
+          
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('period', newPeriod);
+          newUrl.searchParams.set('country', newCountry);
+          
+          window.location.href = newUrl.toString();
+        }
       });
-      
-      // Window resize handler
-      window.addEventListener('resize', syncHeights);
-      
-      function updateUrlAndReload() {
-        const newPeriod = document.querySelector('input[name="period"]:checked').value;
-        const newCountry = document.getElementById('countrySelect').value;
-        
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.set('period', newPeriod);
-        newUrl.searchParams.set('country', newCountry);
-        
-        window.location.href = newUrl.toString();
-      }
-    });
-  </script>
+    </script>
+  </div>
 </body>
 </html>
