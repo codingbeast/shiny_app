@@ -379,7 +379,7 @@ def home():
 
             # Save to BytesIO and return as image
             buf = io.BytesIO()
-            fig.savefig(buf, format="png", bbox_inches="tight")
+            fig.savefig(buf, format="png", bbox_inches="tight",pad_inches=0.01)
             buf.seek(0)
             img_data_buttom = base64.b64encode(buf.read()).decode('utf-8')
     context = {
