@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Your existing CSS styles remain the same */
+    /* Base styles */
     .box {
       border: 2px solid #333;
       margin-bottom: 1rem;
@@ -15,15 +15,36 @@
       min-height: 123px;
       border-radius: 1px;
     }
-    .box-graph {
-      min-height: 123px;
-      border-radius: 1px;
-    }
-    .box-graph-with-border {
-      min-height: 123px;
-      border-radius: 1px;
+    
+    /* Graph container - left (main plot) */
+    .main-plot-container {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background-color: white;
     }
     
+    /* Graph container - right (example plot) */
+    .example-plot-container {
+      border: 2px solid #333;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background-color: white;
+    }
+    
+    /* Image styles - ensures perfect visibility */
+    .plot-image {
+      width: 100%;
+      height: 100%;
+      object-fit: scale-down; /* Ensures full visibility while fitting container */
+      display: block;
+      background-color: white; /* Match your image background */
+    }
+    
+    /* Form element styles */
     .custom-box {
       display: flex;
       flex-direction: column;
@@ -53,6 +74,8 @@
       text-align: center;
       border-radius: 8px;
       padding: 0.375rem 0.75rem;
+      background-image: none !important;
+      padding-right: 0.75rem;
     }
     
     .radio-container {
@@ -79,28 +102,29 @@
     .form-check-input {
       margin-right: 8px;
     }
-    /* Remove default dropdown arrow */
-    select.form-select {
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      appearance: none;
-      background-image: none !important; /* Remove any background arrow */
-      padding-right: 0.75rem; /* Adjust padding to remove space for arrow */
+    
+    /* Equal height row solution */
+    .image-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
     }
     
-    /* For IE11 (if needed) */
-    select.form-select::-ms-expand {
-      display: none;
+    .image-row > [class*='col-'] {
+      display: flex;
+      flex-direction: column;
     }
-   .fixed-height-img {
-    height: 300px;         /* or whatever height you desire */
-    object-fit: contain;   /* Use 'contain' or 'cover' depending on preference */
-    width: 100%;
-  }
+    
+    /* Height control */
+    .plot-wrapper {
+      min-height: 400px; /* Set minimum height for visibility */
+      flex-grow: 1;
+    }
   </style>
 </head>
 <body>
   <div class="container mt-5">
+    <!-- Form controls row -->
     <div class="row justify-content-center">
       <!-- Radio Button Box -->
       <div class="col-12 col-sm-6 col-md-6 col-lg-4 col-xl-3 col-xxl-3">
@@ -124,7 +148,7 @@
         </div>
       </div>
       
-      <!-- Country Select Box with External Icon -->
+      <!-- Country Select Box -->
       <div class="col-12 col-sm-6 col-md-6 col-lg-4 col-xl-3 col-xxl-3">
         <div class="box">
           <div class="custom-box">
@@ -146,64 +170,101 @@
       </div>
     </div>
 
-    <!-- Other boxes -->
-    <div class="row justify-content-center">
+    <!-- Image row - perfectly matched heights -->
+    <div class="row justify-content-center image-row">
+      <!-- Main Plot (no additional border) -->
       <div class="col-12 col-sm-12 col-md-12 col-lg-8 offset-lg-2 col-xl-6 offset-xl-2 col-xxl-6 offset-xxl-2">
-        <div class="box-graph-with-border text-center">
-          <img src="data:image/png;base64,{{img_data }}" alt="Monthly Preventiveness Plot" class="img-fluid">
+        <div class="plot-wrapper">
+          <div class="main-plot-container">
+            <img src="data:image/png;base64,{{img_data }}" alt="Monthly Preventiveness Plot" class="plot-image">
+          </div>
         </div>
       </div>
+      
+      <!-- Example Plot (with border) -->
       <div class="col-12 col-sm-12 col-md-12 col-lg-2 col-xl-2 col-xxl-2">
-        <div class="box text-center">
-          <img src="/example_plot" class="img-fluid" alt="Generated Visualization">
+        <div class="plot-wrapper">
+          <div class="example-plot-container">
+            <img src="/example_plot" class="plot-image" alt="Generated Visualization">
+          </div>
         </div>
-        
       </div>
     </div>
+
+    <!-- Bottom image (conditional) -->
     {% if is_month %}
     <div class="row justify-content-center">
       <div class="col-12 col-sm-12 col-md-12 col-lg-8 col-xl-6 col-xxl-6">
-        <div class="box-graph text-center">
-          <img src="data:image/png;base64,{{img_data_buttom }}" class="img-fluid" />
+        <div class="main-plot-container">
+          <img src="data:image/png;base64,{{img_data_buttom }}" class="plot-image">
         </div>
       </div>
     </div>
     {% endif %}
-
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // Get the current URL parameters
+      // URL parameter handling
       const urlParams = new URLSearchParams(window.location.search);
       let period = urlParams.get('period') || 'monthly';
       let country = urlParams.get('country') || '{{ selected_country_name }}';
       
-      // Set initial values from URL
+      // Set initial values
       document.querySelector(`input[value="${period}"]`).checked = true;
       document.getElementById('countrySelect').value = country;
       
-      // Add event listeners for changes
+      // Event listeners
       document.querySelectorAll('input[name="period"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-          updateUrlAndReload();
-        });
+        radio.addEventListener('change', updateUrlAndReload);
       });
       
-      document.getElementById('countrySelect').addEventListener('change', function() {
-        updateUrlAndReload();
+      document.getElementById('countrySelect').addEventListener('change', updateUrlAndReload);
+      
+      // Perfect height synchronization
+      function syncHeights() {
+        const mainPlot = document.querySelector('.main-plot-container');
+        const examplePlot = document.querySelector('.example-plot-container');
+        
+        if (!mainPlot || !examplePlot) return;
+        
+        // Reset heights to natural sizes
+        mainPlot.style.height = 'auto';
+        examplePlot.style.height = 'auto';
+        
+        // Get the maximum height
+        const maxHeight = Math.max(
+          mainPlot.offsetHeight,
+          examplePlot.offsetHeight
+        );
+        
+        // Apply the maximum height to both
+        if (maxHeight > 0) {
+          mainPlot.style.height = `${maxHeight}px`;
+          examplePlot.style.height = `${maxHeight}px`;
+        }
+      }
+      
+      // Run synchronization
+      syncHeights();
+      
+      // Add resize observer for dynamic content
+      const resizeObserver = new ResizeObserver(syncHeights);
+      document.querySelectorAll('.plot-image').forEach(img => {
+        resizeObserver.observe(img);
       });
+      
+      // Window resize handler
+      window.addEventListener('resize', syncHeights);
       
       function updateUrlAndReload() {
         const newPeriod = document.querySelector('input[name="period"]:checked').value;
         const newCountry = document.getElementById('countrySelect').value;
         
-        // Update URL with new parameters
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.set('period', newPeriod);
         newUrl.searchParams.set('country', newCountry);
         
-        // Reload the page with new parameters
         window.location.href = newUrl.toString();
       }
     });

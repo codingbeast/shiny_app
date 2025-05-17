@@ -302,8 +302,9 @@ class DataParser:
         ax.set_yticks(np.arange(len(events)))
         ax.set_yticklabels(events,fontsize=9)
         ax.grid(False)
+        
         # # Automatically adjust layout
-        plt.tight_layout()
+        plt.tight_layout(pad=0)
         # Remove the graph border
         # for spine in ax.spines.values():
         #     spine.set_visible(False)
@@ -366,7 +367,7 @@ def home():
         ax = fig.add_subplot(1, 1, 1)
         DataParser.fast_plot_monthly(parsed_df, ax)
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight')
+        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.01)
         buf.seek(0)
         img_data = base64.b64encode(buf.read()).decode('utf-8')
         #-- genrate chart 2 buttom ====
