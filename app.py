@@ -1,6 +1,7 @@
 from flask import Flask, Response, render_template, request, jsonify, send_file
 from matplotlib.figure import Figure
 import pandas as pd
+from flask import  abort
 import matplotlib
 matplotlib.use('Agg')  # Set the backend to Agg for non-interactive plotting
 import matplotlib.pyplot as plt
@@ -351,6 +352,8 @@ def home():
     country_names = helper.get_country_names()
     period = request.args.get('period',DEFAULT_PERIOD)
     country = request.args.get('country',DEFAULT_COUNTRY)
+    if (country != None and country not in country_names) or period not in ["daily", "monthly"]:
+        abort(400, description="Invalid or tampered 'country' parameter")
     country_data = data_manager.get_country_data(period, country)
     if not country_data.empty:
         if period=="monthly":
