@@ -26,9 +26,9 @@ class DataParser:
 
     @staticmethod
     def fast_plot_monthly(df, ax,  n_circles=11):
-        circle_radius = 0.15
-        circle_gap = 0.4
-        bar_width = 0.6
+        circle_radius = 0.11
+        circle_gap = 0.3
+        bar_width = 0.3
 
         patches = []
         colors = []
@@ -366,11 +366,11 @@ def home():
     img_data = None
     img_data_buttom = None
     if not parsed_df.empty:
-        fig = Figure(figsize=(10, 8))
+        fig = Figure(figsize=(10, 5))
         ax = fig.add_subplot(1, 1, 1)
         DataParser.fast_plot_monthly(parsed_df, ax)
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.01)
+        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.02)
         buf.seek(0)
         img_data = base64.b64encode(buf.read()).decode('utf-8')
         #-- genrate chart 2 buttom ====
