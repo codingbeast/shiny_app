@@ -50,7 +50,10 @@ class OSACAggregateProcessor:
         # Step 2: Create complete date range
         #start_date = df['date'].min()
         start_date = pd.to_datetime("2004-01-01")
-        end_date = df['date'].max()
+        #end_date = df['date'].max()
+        today = datetime.now().date()
+        end_of_month = pd.to_datetime(datetime(today.year, today.month, 1) + pd.offsets.MonthEnd(1))
+        end_date = min(df['date'].max(), end_of_month)
         full_dates_df = self.get_all_country_dates(start_date, end_date)
         full_dates_df['date'] = pd.to_datetime(full_dates_df['date']).dt.normalize()
 
