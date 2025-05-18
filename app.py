@@ -37,16 +37,16 @@ class DataParser:
         for idx, row in enumerate(df[['protest', 'anticipated', 'suppression']].values):
             p, a, s = row
 
-            if (p, a, s) == (1, 1, 1):
+            if (a, s) == (1,1):
                 color = 'green'
                 solid = True
-            elif (p, a, s) == (1, 1, 0):
+            elif (a, s) == (1,0):
                 color = 'gray'
                 solid = True
-            elif (p, a, s) in [(1, 0, 1), (0, 1, 1)]:
+            elif (a, s) in (0,1):
                 color = 'green'
                 solid = False
-            elif (p, a, s) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
+            elif (a, s) == (0,0):
                 color = 'gray'
                 solid = False
             else:
@@ -233,7 +233,7 @@ class DataParser:
         ]
         titles = [
             "None Anticipated,\nNone Suppressed",
-            "None Anticipated,\nNone Suppressed",
+            "None Anticipated,\nAny Suppressed",
             "Any Anticipated,\nNone Suppressed",
             "Any Anticipated,\nAny Suppressed",
         ]
