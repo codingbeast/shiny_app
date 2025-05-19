@@ -11,8 +11,8 @@ output/
 osac.csv
 OSAC_parsed.csv
 demo_server.pem
-OSAC_daily.csv
-OSAC_monthly.csv
+# OSAC_daily.csv
+# OSAC_monthly.csv
 # Distribution / packaging
 .Python
 build/
