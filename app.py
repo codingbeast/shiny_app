@@ -38,20 +38,29 @@ class DataParser:
         for idx, row in enumerate(df[['protest', 'anticipated', 'suppression']].values):
             p, a, s = row
 
-            if (p, a, s) == (1, 1, 1):
+            # Skip if not a protest
+            if p != 1:
+                continue  # No bar for non-protests
+
+            # Categorize protests only
+            if a == 1 and s == 1:
                 color = 'green'
                 solid = True
-            elif (p, a, s) == (1, 1, 0):
+                label = 'Any anticipated, any suppressed'
+            elif a == 1 and s == 0:
                 color = 'gray'
                 solid = True
-            elif (p, a, s) in [(1, 0, 1), (0, 1, 1)]:
+                label = 'Any anticipated, none suppressed'
+            elif a == 0 and s == 1:
                 color = 'green'
                 solid = False
-            elif (p, a, s) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
+                label = 'None anticipated, any suppressed'
+            elif a == 0 and s == 0:
                 color = 'gray'
                 solid = False
+                label = 'None anticipated, none suppressed'
             else:
-                continue  # (0,0,0)
+                continue  # Fallback (shouldn't happen if data is clean)
 
             if solid:
                 ax.bar(idx, bar_height, color=color, width=bar_width)
