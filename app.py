@@ -39,7 +39,7 @@ class DataParser:
             p, a, s = row
 
             # Skip if not a protest
-            if p != 1:
+            if p != 1 and p !=1 and a!=1:
                 continue  # No bar for non-protests
 
             # Categorize protests only
@@ -434,5 +434,5 @@ def serve_preventiveness_plot():
 
 
 if __name__ == '__main__':
-    # app.run(debug=True)
+    #app.run(debug=True)
     app.run(host='0.0.0.0')
