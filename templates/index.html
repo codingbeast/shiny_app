@@ -15,7 +15,6 @@
       min-height: 123px;
       border-radius: 1px;
     }
-    
     /* Main plot container (left) */
     .main-plot-container {
       padding: 0;
@@ -142,6 +141,61 @@
     /* .bottom-image-row {
       margin-top: 10px;
     } */
+    /* Container must be relative for absolute positioning */
+    .position-relative {
+      position: relative;
+    }
+
+    /* Floating text (left side) */
+    .floating-text-left {
+      position: absolute;
+      left: -100px;  /* Adjust based on how much overflow you want */
+      top: 50%;
+      transform: translateY(-50%);
+      white-space: nowrap;  /* Prevents text wrapping */
+      background: rgba(255, 255, 255, 0.8);  /* Optional: Makes text readable */
+      padding: 5px 10px;
+      border-radius: 4px;
+    }
+    /* Default (xl screens and larger) */
+    .custom-box-text p {
+      font-size: 14px; /* Base size */
+    }
+
+    /* xxl (1400px+) - Optional adjustment */
+    @media (min-width: 1400px) {
+      .custom-box-text p {
+        font-size: 15px;
+      }
+    }
+
+    /* lg (992px-1199px) */
+    @media (max-width: 1199.98px) {
+      .custom-box-text p {
+        font-size: 13px;
+      }
+    }
+
+    /* md (768px-991px) */
+    @media (max-width: 991.98px) {
+      .custom-box-text p {
+        font-size: 12px;
+      }
+    }
+
+    /* sm (576px-767px) */
+    @media (max-width: 767.98px) {
+      .custom-box-text p {
+        font-size: 11px;
+      }
+    }
+
+    /* xs (<576px) */
+    @media (max-width: 575.98px) {
+      .custom-box-text p {
+        font-size: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -214,11 +268,26 @@
     </div>
 
     <!-- Bottom image row -->
+    <!-- Bottom image row -->
     {% if is_month %}
-    <div class="row justify-content-center bottom-image-row">
-      <div class="col-12 col-sm-12 col-md-12 col-lg-8 col-xl-6 col-xxl-6">
+    <div class="row justify-content-center bottom-image-row" style="padding-top: 2px;">
+      <!-- Bottom image - centered exactly as before -->
+      <div class="col-12 col-sm-12 col-md-12 col-lg-8 offset-lg-2 col-xl-6 offset-xl-2 col-xxl-6 offset-xxl-2">
         <div class="bottom-plot-container">
-          <img src="data:image/png;base64,{{img_data_buttom }}" class="bottom-plot-image">
+          <img src="data:image/png;base64,{{img_data_bottom }}" class="bottom-plot-image">
+        </div>
+      </div>
+      
+      <!-- New box that takes only the remaining side space -->
+      <div class="col-12 col-sm-12 col-md-12 col-lg-2 col-xl-2 col-xxl-2">
+        <div class="box-text p1">
+          <div class="custom-box-text">
+            <!-- Your content here -->
+            <p class="fs-12 mb-sm-1 mb-md-1 mb-xxl-2" style="padding-top: 3px;">Any Protest</p>
+            <p class="fs-12 mb-sm-1 mb-md-1  mb-xxl-2">Any Anticipated Protest</p>
+            <p class="fs-12 mb-sm-1 mb-md-1  mb-xxl-2">Any Suppressed Protest</p>
+            <p class="fs-12 mb-sm-1 mb-md-1  mb-xxl-2">Index of Preventiveness</p>
+          </div>
         </div>
       </div>
     </div>

@@ -309,8 +309,8 @@ class DataParser:
         # Customize axes
         ax.set_xticks([])
         ax.set_xticklabels([])  # No x-axis labels
-        ax.set_yticks(np.arange(len(events)))
-        ax.set_yticklabels(events,fontsize=9)
+        ax.set_yticks([])
+        ax.set_yticklabels([],fontsize=9) #
         ax.grid(False)
         
         # # Automatically adjust layout
@@ -393,12 +393,12 @@ def home():
             buf = io.BytesIO()
             fig.savefig(buf, format="png", bbox_inches="tight",pad_inches=0.01)
             buf.seek(0)
-            img_data_buttom = base64.b64encode(buf.read()).decode('utf-8')
+            img_data_bottom = base64.b64encode(buf.read()).decode('utf-8')
     context = {
         "selected_country_name" : DEFAULT_COUNTRY,
         "country_names" : country_names,
         "img_data" : img_data,
-        "img_data_buttom" : img_data_buttom,
+        "img_data_bottom" : img_data_bottom,
         "is_month" : True if period == "monthly" else False
     }
     return render_template('index.html',**context)
@@ -434,5 +434,5 @@ def serve_preventiveness_plot():
 
 
 if __name__ == '__main__':
-    #app.run(debug=True)
-    app.run(host='0.0.0.0')
+    app.run(debug=True)
+    #app.run(host='0.0.0.0')
