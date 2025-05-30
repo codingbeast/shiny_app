@@ -1,32 +1,32 @@
 Burkina Faso
 Monaco
 Bermuda
-Holy See
+Holy See,,Vatican City
 Jersey
-North Korea
+North Korea,,DPRK,,Democratic People’s Republic of Korea (DPRK)
+South Korea,,ROK,,Republic of Korea (ROK)
 French Guiana
-Central African Republic
+Central African Republic,,CAR
 Jamaica
 Togo
-Syrian Arab Republic
+Syrian Arab Republic,,Syria
 Saint Vincent and the Grenadines
-Timor-Leste
 Kuwait
 Tajikistan
-Côte d'Ivoire
-Svalbard  Jan Mayen
+Côte d'Ivoire,,Cote d'Ivoire,,Ivory Coast
+Svalbard and Jan Mayen
 Gibraltar
 Kazakhstan
 Saint Martin
-Türkiye, Turkiye
+Türkiye,,Turkiye,,Turkey 
 Chad
 Myanmar
 Qatar
 Cocos (Keeling) Islands
-South Georgia, he South Sandwich Islands
+South Georgia,,the South Sandwich Islands
 Slovenia
-Brunei Darussalam
-Turks and Caicos Islands
+Brunei Darussalam,,Brunei
+Turks and Caicos,,TCI
 Comoros
 Hong Kong
 Cuba
@@ -36,12 +36,11 @@ Guinea-Bissau
 Suriname
 Belgium
 Ukraine
-Ivory Coast, Côte d'Ivoire
 Luxembourg
 Peru
 Tunisia
 Haiti
-Macao
+Macao,,Macau
 Montserrat
 Samoa
 Solomon Islands
@@ -51,38 +50,37 @@ Bangladesh
 French Polynesia
 Albania
 Somalia
-Malvinas, Falkland Islands
+Malvinas,,Falkland Islands
 Nigeria
 Lesotho
-United States of America
+United States of America,,USA 
 Antigua and Barbuda
 Mauritius
-Jan Mayen, Svalbard, Jan Mayen
-East Timor, Timor-Leste.
+East Timor,,Timor-Leste
 Greece
 Oman
 Madagascar
 Angola
-United Kingdom of Great Britain and Northern Ireland
+United Kingdom (UK),,United Kingdom of Great Britain and Northern Ireland,,Britain
 Netherlands
 Iran
 Maldives
-Russian Federation
+Russian Federation,,Russia
 Bouvet Island
-Burma , Myanmar
-Saint Helena  Ascension Island  Tristan da Cunha
+Burma,,Myanmar
+Saint Helena, Ascension Island, Tristan da Cunha
 Singapore
 Brazil
 Gambia
 Ghana
 Sint Maarten
 Poland
-Dominican Republic (the)
+Dominican Republic
 Italy
 France
-Viet Nam
+Viet Nam,,Vietnam 
 Botswana
-Lao People's Democratic Republic
+Lao People's Democratic Republic,,Laos
 Micronesia
 Tonga
 Bhutan
@@ -94,7 +92,8 @@ El Salvador
 Germany
 Libya
 Aruba
-Congo
+Congo-Kinshasa
+Congo-Brazzaville
 Malawi
 Kiribati
 North Macedonia
@@ -103,12 +102,11 @@ Lithuania
 United States Minor Outlying Islands
 Philippines
 Benin
-British Virgin Islands, Virgin Islands (British)
+British Virgin Islands,,Virgin Islands (British),,BVI
 Egypt
 Nicaragua
 Cayman Islands
 Niue
-Vatican City, Holy See
 Bahamas
 Sri Lanka
 Cook Islands
@@ -121,10 +119,9 @@ Liechtenstein
 Northern Mariana Islands
 Eritrea
 Serbia
-Western Sahara
+
 Antarctica
 Mali
-Virgin Islands (British)
 Jordan
 Saint Kitts and Nevis
 Ecuador
@@ -146,8 +143,8 @@ Yemen
 Korea
 Morocco
 Belize
-United Kingdom, Great Britain
-Tanzania, the United Republic of
+United Kingdom,,Great Britain,,Britain,,United Kingdom (UK)
+Tanzania,,the United Republic of Tanzania
 Belarus
 Guatemala
 Namibia
@@ -169,9 +166,9 @@ San Marino
 British Indian Ocean Territory
 Guam
 India
-Sahrawi Arab Democratic Republic, Western Sahara.
+Sahrawi Arab Democratic Republic,,SADR,,Sahrawi Republic,,Western Sahara,,Western Sahara,,Sahrawi Arab Democratic Republic
 American Samoa
-United Arab Emirates
+United Arab Emirates,,UAE
 Seychelles
 Colombia
 Dominica
@@ -181,11 +178,11 @@ Georgia
 Paraguay
 Turkmenistan
 Costa Rica
-United States Virgin Islands, Virgin Islands (U.S.)
+United States Virgin Islands,,Virgin Islands (U.S.)
 Saint Pierre and Miquelon
 South Sudan
 Panama
-Bolivia (Plurinational State of)
+Bolivia,,Plurinational State of Bolivia
 Venezuela
 Indonesia
 New Caledonia
@@ -196,8 +193,8 @@ Israel
 Andorra
 Mexico
 Armenia
-Isle of Man
-Eswatini
+Isle of Man,,Mann
+Eswatini,,Swaziland 
 Finland
 Liberia
 Moldova
@@ -215,13 +212,13 @@ Christmas Island
 French Southern Territories
 Croatia
 Kyrgyzstan
-Taiwan (Province of China)
+Taiwan
 Sudan
 Sweden
 Romania
-Heard Island, McDonald Islands
+Heard Island and McDonald Islands
 Uganda
-Trinidad and Tobago
+Trinidad and Tobago,,Republic of Trinidad and Tobago
 Australia
 Mauritania
 Algeria
@@ -233,19 +230,19 @@ Uzbekistan
 Equatorial Guinea
 Anguilla
 Montenegro
-Cape Verde, Cabo Verde.
+Cape Verde,,Cabo Verde
 Virgin Islands (U.S.)
 Guinea
-Sao Tome and Principe
+Sao Tome and Principe,,São Tomé and Príncipe
 Guadeloupe
 Mayotte
 Nepal
 South Africa
 Afghanistan
 Pakistan
-Bonaire, Sint Eustatius, Saba
+Bonaire, Sint Eustatius, and Saba,,Caribbean Netherlands
 Malaysia
-China
+China,,PRC 
 Gabon
 Azerbaijan
 Saint Lucia
@@ -253,7 +250,7 @@ Marshall Islands
 Caribbean Netherlands
 Bosnia and Herzegovina
 Martinique
-Palestine
+Palestine,,State of Palestine
 Bulgaria
-Czechia
+Czechia,,Czech Republic
 Ireland
