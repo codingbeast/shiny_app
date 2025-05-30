@@ -11,7 +11,21 @@ class OSACDateParser:
     def __init__(self):
         # Load spaCy model for NER
         self.nlp = spacy.load("en_core_web_sm")
-
+    def extract_month(self, text: str) -> Optional[int]:
+        """
+        Extract the month (as an integer 1–12) from a date text.
+        Returns None if not found.
+        """
+        months = {
+            "january": 1, "february": 2, "march": 3, "april": 4,
+            "may": 5, "june": 6, "july": 7, "august": 8,
+            "september": 9, "october": 10, "november": 11, "december": 12
+        }
+        text = text.lower()
+        for month_name, month_num in months.items():
+            if month_name in text:
+                return month_num
+        return None
     def parse_date(self, text: str, osac_date: str = '') -> str:
         """
         Extract and validate dates from text.
@@ -33,9 +47,15 @@ class OSACDateParser:
 
         doc = self.nlp(text)
         dates = []
+
         for ent in doc.ents:
             if ent.label_ == "DATE":
-                parsed_dates = self.preprocess_and_parse_dates([ent.text], default_date=default_date, default_year=default_year)
+                mentioned_month = self.extract_month(ent.text)
+                if mentioned_month and default_date and mentioned_month < default_date.month:
+                    adjusted_year = default_date.year + 1
+                else:
+                    adjusted_year = default_date.year
+                parsed_dates = self.preprocess_and_parse_dates([ent.text], default_date=default_date, default_year=adjusted_year)
                 for date in parsed_dates:
                     str_date = date.strftime('%d/%m/%Y')
                     if str_date not in dates:

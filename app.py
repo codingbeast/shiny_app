@@ -373,7 +373,7 @@ def home():
         parsed_df = pd.DataFrame()
     # --- Generate chart only if valid dataframe ---
     img_data = None
-    img_data_buttom = None
+    img_data_bottom = None
     if not parsed_df.empty:
         fig = Figure(figsize=(10, 5))
         ax = fig.add_subplot(1, 1, 1)
@@ -434,5 +434,5 @@ def serve_preventiveness_plot():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
-    #app.run(host='0.0.0.0')
+    #app.run(debug=True)
+    app.run(host='0.0.0.0')
