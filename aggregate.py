@@ -10,7 +10,7 @@ class OSACAggregateProcessor:
             self.df = pd.read_csv(self.parsed_file_name, encoding='utf-8')
             # Load all ISO countries
             with open(iso_country_file, 'r', encoding='utf-8') as f:
-                self.all_countries = [line.strip() for line in f if line.strip()]
+                self.all_countries = [line.strip().split(",,")[0] for line in f if line.strip()]
         except Exception as e:
             raise FileNotFoundError(f"File not found: {e}")
 
