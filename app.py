@@ -348,7 +348,7 @@ class Helper:
         pass
     def get_country_names(self):
         with open(COUNTRY_PATH, 'r', encoding='utf-8') as f:
-            country_names = f.read().splitlines()
+            country_names = [i.split(",,")[0] for i in f.read().splitlines()]
             return country_names
 
 
