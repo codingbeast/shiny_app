@@ -1,3 +1,4 @@
+from typing import Optional
 import pandas as pd
 from dateutil.parser import parse
 from datetime import datetime
@@ -14,14 +15,14 @@ class OSACAggregateProcessor:
         except Exception as e:
             raise FileNotFoundError(f"File not found: {e}")
 
-    def safe_parse(self, x):
-        if isinstance(x, datetime):
-            return x
+    def safe_parse(self, date_str: str, format: str = "%Y-%m-%d") -> Optional[datetime]:
         try:
-            return parse(x, fuzzy=True)
+            return datetime.strptime(date_str.strip(), format)
         except Exception:
-            return pd.NaT
-
+            try:
+                return parse(date_str,fuzzy=True)  # Fallback to flexible parsing
+            except Exception:
+                return pd.NaT
     def get_all_country_dates(self, start_date, end_date):
         # Create a full date range using ALL ISO countries
         full_dates = pd.date_range(start=start_date, end=end_date, freq='D')
@@ -40,7 +41,10 @@ class OSACAggregateProcessor:
         df.dropna(subset=['country', 'date'], how='any', inplace=True)
         
         # Convert dates and ensure consistent format
-        df['date'] = pd.to_datetime(df['date'].apply(self.safe_parse)).dt.normalize()
+        #df['date'] = pd.to_datetime(df['date'].apply(self.safe_parse)).dt.normalize()
+        df['date'] = pd.to_datetime(df['date'].apply(self.safe_parse), format="%d/%m/%Y", errors='coerce').dt.normalize()
+
+
         df = df.dropna(subset=['date'])
         
         # Convert indicators to integers
