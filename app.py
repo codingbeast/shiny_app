@@ -87,10 +87,9 @@ class DataParser:
         #     spine.set_visible(False)
     @staticmethod
     def calculate_preventiveness(row):
-        protest = row['protest']
-        anticipated = row['anticipated']
-        suppression = row['suppression']
-
+        protest = row['Any Protest']
+        anticipated = row['Any Anticipated Protest']
+        suppression = row['Any Suppressed Protest']
         # Match exactly against the known patterns
         if protest == 1 and anticipated == 1 and suppression == 0:
             return 0
@@ -100,16 +99,16 @@ class DataParser:
             return 1
         elif protest == 1 and anticipated == 0 and suppression == 0:
             return 1
-        elif protest == 0 and anticipated == 0 and suppression == 1:
-            return 1
-        elif protest == 0 and anticipated == 1 and suppression == 0:
-            return 0
-        elif protest == 0 and anticipated == 1 and suppression == 1:
-            return 1
+        # elif protest == 0 and anticipated == 0 and suppression == 1: #not confirmed 
+        #     return 1
+        # elif protest == 0 and anticipated == 1 and suppression == 0: #not confirmed
+        #     return 0
+        # elif protest == 0 and anticipated == 1 and suppression == 1: #not confirmed
+        #     return 1
         elif protest == 1 and anticipated == 1 and suppression == 1:
             return 0
         else:
-            return 0  # Default case (for safety)
+            return 1  # Default case (for safety)
 
     @staticmethod
     def monthly_df_parsed(df: pd.DataFrame) -> pd.DataFrame:
@@ -271,12 +270,16 @@ class DataParser:
     def fast_plot_preventiveness(df, ax):
         # Prepare dataframe
         df = df.copy()
+        df['Any Protest'] = df['protest']
+        df['Any Anticipated Protest'] = ((df['protest'] == 1) & (df['anticipated'] == 1)).astype(int)
+        df['Any Suppressed Protest'] =  ((df['protest'] == 1) & df['suppression'] == 1).astype(int)
         df['Index of Preventiveness'] = df.apply(DataParser.calculate_preventiveness, axis=1)
-        df.rename(columns={
-            'protest': 'Any Protest',
-            'suppression': 'Any Suppressed Protest',
-            'anticipated': 'Any Anticipated Protest',
-        }, inplace=True)
+        df = df[[ 'Any Protest','Any Suppressed Protest','Any Anticipated Protest','Index of Preventiveness']]
+        # df.rename(columns={
+        #     'protest': 'Any Protest',
+        #     'suppression': 'Any Suppressed Protest',
+        #     'anticipated': 'Any Anticipated Protest',
+        # }, inplace=True)
         
         # Extract event data and transpose for imshow
         events = DataParser.get_monthy_df_preventiveness_titles()
