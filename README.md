@@ -197,3 +197,10 @@ python scraper.py
 chmod +x scraper.sh
 ./scraper.sh
 ```
+### if you are using git
+```sudo apt install git-lfs
+git lfs install
+git clone github.com/username/shiny_app.git
+git pull
+git git lfs pull
+```
